@@ -156,8 +156,11 @@ class ThunderManager private constructor() {
             .map { it.mFileIndex }
             .toIntArray()
 
+        // 只下载用户选中的这个文件。注意必须是 intArrayOf(index)（内容为 index 的单元素数组），
+        // 而非 IntArray(index)（长度为 index、全 0 的数组）——后者会让迅雷去下第 0 个文件，
+        // 多文件种子（如整季番剧）随后 getLocalUrl 取第 index 个文件路径时本地代理找不到，必 404。
         val selectedIndexSet = BtIndexSet(1).apply {
-            mIndexSet = IntArray(index)
+            mIndexSet = intArrayOf(index)
         }
         val deselectIndexSet = BtIndexSet(deselectedIndexes.size).apply {
             mIndexSet = deselectedIndexes

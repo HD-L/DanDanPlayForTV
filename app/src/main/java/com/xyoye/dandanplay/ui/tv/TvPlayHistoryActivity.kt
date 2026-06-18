@@ -123,7 +123,13 @@ internal fun TvPlayHistoryScreen(
         viewModel.updatePlayHistory()
     }
     DisposableEffect(Unit) {
-        val observer = Observer<Any> {
+        // playLiveData 是普通（粘性）LiveData，被当作"播放"一次性事件用。每次重进面板都会注册一个
+        // 全新的 Observer，而 LiveData 会把"上一次播放"残留的值立刻重投给新 Observer——这会导致一进
+        // 历史/串流/磁链页就自动跳到播放器续播上一个视频。这里记录注册时已存在的粘性值并跳过这次重投，
+        // 只响应注册之后用户真正点击条目触发的播放事件。
+        val staleValue = viewModel.playLiveData.value
+        val observer = Observer<Any> { value ->
+            if (value === staleValue) return@Observer
             ARouter.getInstance().build(RouteTable.Player.Player).navigation(context)
         }
         viewModel.playLiveData.observe(lifecycleOwner, observer)

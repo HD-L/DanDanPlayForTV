@@ -6,10 +6,13 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -17,6 +20,10 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items as gridItems
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -29,8 +36,11 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
+import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import com.xyoye.data_component.data.AnimeData
 import java.util.Calendar
@@ -42,7 +52,10 @@ import java.util.Calendar
  * 两个标签页共用同一套番剧详情弹窗。
  */
 @Composable
-fun TvWeeklyAnimeScreen(modifier: Modifier = Modifier) {
+fun TvWeeklyAnimeScreen(
+    modifier: Modifier = Modifier,
+    onSearch: () -> Unit = {}
+) {
     val animeViewModel: TvAnimeViewModel = viewModel()
     var tab by remember { mutableStateOf(0) }   // 0=每周番剧, 1=我的追番
 
@@ -51,11 +64,19 @@ fun TvWeeklyAnimeScreen(modifier: Modifier = Modifier) {
             .fillMaxSize()
             .padding(start = 32.dp, top = 24.dp, end = 32.dp, bottom = 24.dp)
     ) {
-        TvTabRow(
-            tabs = listOf("每周番剧", "我的追番"),
-            selectedIndex = tab,
-            onSelect = { tab = it }
-        )
+        // tag 行：左侧选项卡，最右侧搜索入口（遥控器从选项卡右移即可聚焦）
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TvTabRow(
+                tabs = listOf("每周番剧", "我的追番"),
+                selectedIndex = tab,
+                onSelect = { tab = it }
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            SearchEntryButton(onClick = onSearch)
+        }
         Spacer(modifier = Modifier.height(16.dp))
         Box(modifier = Modifier.fillMaxSize()) {
             when (tab) {
@@ -67,6 +88,35 @@ fun TvWeeklyAnimeScreen(modifier: Modifier = Modifier) {
 
     animeViewModel.detail?.let { bangumi ->
         AnimeDetailDialog(bangumi = bangumi, onDismiss = { animeViewModel.closeDetail() })
+    }
+}
+
+/** tag 行最右侧的搜索入口按钮：遥控器可聚焦（聚焦蓝底高亮 + 放大），点击切到全局搜索页。 */
+@Composable
+private fun SearchEntryButton(onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.06f),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = Color(0x1FFFFFFF),
+            contentColor = Color(0xFFBFBFBF),
+            focusedContainerColor = Color(0xFF3F8CFF),
+            focusedContentColor = Color.White
+        )
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Default.Search,
+                contentDescription = "搜索",
+                modifier = Modifier.size(18.dp)
+            )
+            Text(text = "搜索", fontSize = 16.sp)
+        }
     }
 }
 

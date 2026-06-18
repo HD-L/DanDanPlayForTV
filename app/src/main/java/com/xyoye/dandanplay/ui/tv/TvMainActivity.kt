@@ -47,6 +47,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
@@ -67,6 +68,8 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -82,6 +85,7 @@ import com.xyoye.common_component.base.BaseAppCompatActivity
 import com.xyoye.common_component.bridge.LoginObserver
 import com.xyoye.common_component.config.RouteTable
 import com.xyoye.common_component.config.ScreencastConfig
+import com.xyoye.common_component.config.UiConfig
 import com.xyoye.common_component.config.UserConfig
 import com.xyoye.common_component.extension.deletable
 import com.xyoye.common_component.services.ScreencastReceiveService
@@ -162,7 +166,7 @@ class TvMainActivity : BaseAppCompatActivity<ActivityTvMainBinding>(), LoginObse
 }
 
 /**
- * 内容区目的地。搜索置顶、设置置底（均通过左侧图标导航栏切换）；
+ * 内容区目的地。设置置底（通过左侧图标导航栏切换）；搜索不在导航栏，而是从「番剧」面板顶部 tag 行的搜索按钮进入。
  * 用户头像不是目的地，而是触发登录弹窗 / 账号信息的独立动作。
  */
 private enum class TvDestination(val title: String, val icon: ImageVector) {
@@ -175,14 +179,56 @@ private enum class TvDestination(val title: String, val icon: ImageVector) {
     SCREENCAST("投屏接收端", Icons.Default.Cast),
 }
 
+/** 可在「界面设置」里开关显隐的内容面板，按导航栏从上到下的固定顺序。SEARCH 不在此列（入口在「番剧」面板）。 */
+private val toggleableDestinations = listOf(
+    TvDestination.HOME,
+    TvDestination.WEEKLY,
+    TvDestination.HISTORY,
+    TvDestination.STREAM,
+    TvDestination.MAGNET,
+    TvDestination.SCREENCAST,
+)
+
+/** 读取某面板当前是否展示（对应「界面设置」的开关，默认展示）。 */
+private fun TvDestination.isVisible(): Boolean = when (this) {
+    TvDestination.HOME -> UiConfig.isShowPosterWall()
+    TvDestination.WEEKLY -> UiConfig.isShowAnime()
+    TvDestination.HISTORY -> UiConfig.isShowHistory()
+    TvDestination.STREAM -> UiConfig.isShowStream()
+    TvDestination.MAGNET -> UiConfig.isShowMagnet()
+    TvDestination.SCREENCAST -> UiConfig.isShowScreencast()
+    TvDestination.SEARCH -> true
+}
+
 @Composable
 private fun TvMainScreen() {
     val context = LocalContext.current
-    var selected by remember { mutableStateOf(TvDestination.HOME) }
+    val lifecycleOwner = LocalLifecycleOwner.current
     var showLogin by remember { mutableStateOf(false) }
+
+    // 当前可见面板（受「界面设置」开关控制）。设置是独立 Activity，返回时按 ON_RESUME 重新读取配置刷新。
+    var visibleDestinations by remember { mutableStateOf(toggleableDestinations.filter { it.isVisible() }) }
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                visibleDestinations = toggleableDestinations.filter { it.isVisible() }
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    var selected by remember { mutableStateOf(visibleDestinations.firstOrNull() ?: TvDestination.HOME) }
+    // 当前选中的面板被隐藏后，回退到第一个可见面板（SEARCH 不在可切换列表里，不受影响）。
+    LaunchedEffect(visibleDestinations) {
+        if (selected in toggleableDestinations && selected !in visibleDestinations) {
+            selected = visibleDestinations.firstOrNull() ?: TvDestination.HOME
+        }
+    }
 
     Row(modifier = Modifier.fillMaxSize()) {
         TvNavRail(
+            destinations = visibleDestinations,
             selected = selected,
             onSelect = { selected = it },
             onUserClick = {
@@ -210,6 +256,7 @@ private fun TvMainScreen() {
                 )
 
                 TvDestination.WEEKLY -> TvWeeklyAnimeScreen(
+                    onSearch = { selected = TvDestination.SEARCH },
                     modifier = Modifier.fillMaxSize()
                 )
 
@@ -245,19 +292,19 @@ private fun TvMainScreen() {
 
 /**
  * 左侧竖排图标导航栏（参考 B 站 TV 番剧页布局）：
- * - 顶部：搜索 → 切到专门的搜索页
- * - 中部：首页 / 媒体库
- * - 底部：用户头像（点按弹出登录弹窗 / 进入账号信息） + 设置（专门的设置页）
+ * - 中部：由 [destinations] 决定展示哪些内容面板（受「界面设置」开关过滤；搜索入口已移至「番剧」面板顶部 tag 行）
+ * - 底部：用户头像（点按弹出登录弹窗 / 进入账号信息） + 设置（专门的设置页，常驻）
  */
 @Composable
 private fun TvNavRail(
+    destinations: List<TvDestination>,
     selected: TvDestination,
     onSelect: (TvDestination) -> Unit,
     onUserClick: () -> Unit,
     onSettingsClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val homeFocus = remember { FocusRequester() }
+    val firstFocus = remember { FocusRequester() }
     Column(
         modifier = modifier
             .width(72.dp)
@@ -265,55 +312,16 @@ private fun TvNavRail(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        // 顶部：搜索
-        NavRailIcon(
-            icon = TvDestination.SEARCH.icon,
-            contentDescription = TvDestination.SEARCH.title,
-            selected = selected == TvDestination.SEARCH,
-            onClick = { onSelect(TvDestination.SEARCH) }
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // 中部：内容导航
-        NavRailIcon(
-            icon = TvDestination.HOME.icon,
-            contentDescription = TvDestination.HOME.title,
-            selected = selected == TvDestination.HOME,
-            focusRequester = homeFocus,
-            onClick = { onSelect(TvDestination.HOME) }
-        )
-        NavRailIcon(
-            icon = TvDestination.WEEKLY.icon,
-            contentDescription = TvDestination.WEEKLY.title,
-            selected = selected == TvDestination.WEEKLY,
-            onClick = { onSelect(TvDestination.WEEKLY) }
-        )
-        NavRailIcon(
-            icon = TvDestination.HISTORY.icon,
-            contentDescription = TvDestination.HISTORY.title,
-            selected = selected == TvDestination.HISTORY,
-            onClick = { onSelect(TvDestination.HISTORY) }
-        )
-        NavRailIcon(
-            icon = TvDestination.STREAM.icon,
-            contentDescription = TvDestination.STREAM.title,
-            selected = selected == TvDestination.STREAM,
-            onClick = { onSelect(TvDestination.STREAM) }
-        )
-        NavRailIcon(
-            icon = TvDestination.MAGNET.icon,
-            contentDescription = TvDestination.MAGNET.title,
-            selected = selected == TvDestination.MAGNET,
-            onClick = { onSelect(TvDestination.MAGNET) }
-        )
-        // 投屏接收端：内嵌内容页（服务启停与本页宿主解耦，离开后服务照常运行）
-        NavRailIcon(
-            icon = TvDestination.SCREENCAST.icon,
-            contentDescription = TvDestination.SCREENCAST.title,
-            selected = selected == TvDestination.SCREENCAST,
-            onClick = { onSelect(TvDestination.SCREENCAST) }
-        )
+        // 内容导航（按「界面设置」的显隐开关过滤；搜索入口已移至「番剧」面板顶部 tag 行）
+        destinations.forEachIndexed { index, dest ->
+            NavRailIcon(
+                icon = dest.icon,
+                contentDescription = dest.title,
+                selected = selected == dest,
+                focusRequester = if (index == 0) firstFocus else null,
+                onClick = { onSelect(dest) }
+            )
+        }
 
         Spacer(modifier = Modifier.weight(1f))
 
@@ -331,7 +339,7 @@ private fun TvNavRail(
             onClick = onSettingsClick
         )
     }
-    LaunchedEffect(Unit) { runCatching { homeFocus.requestFocus() } }
+    LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
 }
 
 /** 导航栏圆形图标按钮：选中态蓝底，聚焦放大 + 白色描边。 */

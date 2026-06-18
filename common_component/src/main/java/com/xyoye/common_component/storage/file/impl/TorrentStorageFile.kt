@@ -33,7 +33,9 @@ class TorrentStorageFile(
     }
 
     override fun fileName(): String {
-        return fileInfo.mFileName
+        // 根目录由 TorrentStorage.getRootFile() 合成，mFileName 为 null；
+        // 返回空串避免非空 String 触发 NPE，上层 TV 浏览器会回退显示「媒体库」。
+        return fileInfo.mFileName ?: ""
     }
 
     override fun fileLength(): Long {

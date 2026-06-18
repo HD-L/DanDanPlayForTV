@@ -47,8 +47,11 @@ import com.xyoye.common_component.config.AppConfig
 import com.xyoye.common_component.config.DanmuConfig
 import com.xyoye.common_component.config.PlayerConfig
 import com.xyoye.common_component.config.SubtitleConfig
+import com.xyoye.common_component.config.UiConfig
+import com.xyoye.common_component.weight.ToastCenter
 
 enum class TvSettingsSection(val title: String) {
+    UI("界面设置"),
     PLAYER("播放器设置"),
     DANMU("弹幕设置"),
     SUBTITLE("字幕设置"),
@@ -65,7 +68,7 @@ enum class TvSettingsSection(val title: String) {
 fun TvSettingsLanding(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     var detail by remember {
-        mutableStateOf<SettingsDetail>(SettingsDetail.Section(TvSettingsSection.PLAYER))
+        mutableStateOf<SettingsDetail>(SettingsDetail.Section(TvSettingsSection.UI))
     }
     val firstFocus = remember { FocusRequester() }
 
@@ -75,7 +78,7 @@ fun TvSettingsLanding(modifier: Modifier = Modifier) {
             SettingsDetail.Func("扫描目录管理", "管理本地视频的扫描目录") { TvScanManagerActivity.start(it) },
             SettingsDetail.Func("常用文件夹", "管理常用文件夹快捷入口") { TvCommonlyFolderActivity.start(it) },
             SettingsDetail.Func("B站弹幕下载", "从哔哩哔哩下载弹幕") { TvBiliBiliDanmuActivity.start(it) },
-            SettingsDetail.Func("射手字幕下载", "从射手网搜索并下载字幕") { TvShooterSubtitleActivity.start(it) },
+            // 「射手字幕下载」入口已移除：密钥配置改到「字幕设置」的 API 密钥 item；搜索下载待挪进播放器字幕菜单。
         )
     }
 
@@ -137,6 +140,7 @@ fun TvSettingsLanding(modifier: Modifier = Modifier) {
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
                     when (d.section) {
+                        TvSettingsSection.UI -> UiSettings()
                         TvSettingsSection.PLAYER -> PlayerSettings()
                         TvSettingsSection.DANMU -> DanmuSettings()
                         TvSettingsSection.SUBTITLE -> SubtitleSettings()
@@ -216,6 +220,37 @@ private fun SettingsNavRow(
 
 /* ----------------- 各分区内容 ----------------- */
 
+/** 界面设置：控制左侧导航栏各内容面板的显隐。左侧功能名 + 右侧显示/隐藏开关，默认全部显示，点击切换。 */
+@Composable
+private fun UiSettings() {
+    // 至少保留一个可见面板：试图关掉最后一个时否决并提示（next 为 true 即开启，恒允许）。
+    val keepAtLeastOne: (Boolean) -> Boolean = { next ->
+        if (!next && currentVisiblePanelCount() <= 1) {
+            ToastCenter.showWarning("至少保留一个面板")
+            false
+        } else {
+            true
+        }
+    }
+
+    TvSwitchRow("海报墙", null, { UiConfig.isShowPosterWall() }, { UiConfig.putShowPosterWall(it) }, onLabel = "显示", offLabel = "隐藏", canChange = keepAtLeastOne)
+    TvSwitchRow("番剧", null, { UiConfig.isShowAnime() }, { UiConfig.putShowAnime(it) }, onLabel = "显示", offLabel = "隐藏", canChange = keepAtLeastOne)
+    TvSwitchRow("历史记录", null, { UiConfig.isShowHistory() }, { UiConfig.putShowHistory(it) }, onLabel = "显示", offLabel = "隐藏", canChange = keepAtLeastOne)
+    TvSwitchRow("串流面板", null, { UiConfig.isShowStream() }, { UiConfig.putShowStream(it) }, onLabel = "显示", offLabel = "隐藏", canChange = keepAtLeastOne)
+    TvSwitchRow("磁力面板", null, { UiConfig.isShowMagnet() }, { UiConfig.putShowMagnet(it) }, onLabel = "显示", offLabel = "隐藏", canChange = keepAtLeastOne)
+    TvSwitchRow("投屏接收", null, { UiConfig.isShowScreencast() }, { UiConfig.putShowScreencast(it) }, onLabel = "显示", offLabel = "隐藏", canChange = keepAtLeastOne)
+}
+
+/** 当前展示的面板数量（界面设置 6 项中处于「显示」的个数）。 */
+private fun currentVisiblePanelCount(): Int = listOf(
+    UiConfig.isShowPosterWall(),
+    UiConfig.isShowAnime(),
+    UiConfig.isShowHistory(),
+    UiConfig.isShowStream(),
+    UiConfig.isShowMagnet(),
+    UiConfig.isShowScreencast()
+).count { it }
+
 @Composable
 private fun PlayerSettings() {
     TvSelectRow(
@@ -250,6 +285,33 @@ private fun SubtitleSettings() {
     TvSwitchRow("自动加载同名字幕", null, { SubtitleConfig.isAutoLoadSameNameSubtitle() }, { SubtitleConfig.putAutoLoadSameNameSubtitle(it) })
     TvInputRow("同名字幕加载优先级", { SubtitleConfig.getSubtitlePriority() ?: "" }, { SubtitleConfig.putSubtitlePriority(it) })
     TvSwitchRow("自动匹配网络字幕", null, { SubtitleConfig.isAutoMatchSubtitle() }, { SubtitleConfig.putAutoMatchSubtitle(it) })
+    ShooterSecretRow()
+}
+
+/** 射手（assrt）字幕 API 密钥配置：左「射手字幕」右「API 密钥」，点击弹窗输入并保存（密码掩码，回填已存密钥）。 */
+@Composable
+private fun ShooterSecretRow() {
+    var showDialog by remember { mutableStateOf(false) }
+
+    Surface(onClick = { showDialog = true }, modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(text = "射手字幕", modifier = Modifier.weight(1f))
+            Text(text = "API 密钥", color = MaterialTheme.colorScheme.primary)
+        }
+    }
+
+    if (showDialog) {
+        TvFormInputDialog(
+            title = "射手字幕 API 密钥",
+            initial = SubtitleConfig.getShooterSecret() ?: "",
+            isPassword = true,
+            onConfirm = {
+                SubtitleConfig.putShooterSecret(it)
+                showDialog = false
+            },
+            onDismiss = { showDialog = false }
+        )
+    }
 }
 
 @Composable
@@ -267,13 +329,20 @@ private fun TvSwitchRow(
     label: String,
     summary: String?,
     get: () -> Boolean,
-    set: (Boolean) -> Unit
+    set: (Boolean) -> Unit,
+    onLabel: String = "开",
+    offLabel: String = "关",
+    canChange: (Boolean) -> Boolean = { true }
 ) {
     var checked by remember { mutableStateOf(get()) }
     Surface(
         onClick = {
-            checked = !checked
-            set(checked)
+            val next = !checked
+            // canChange 返回 false 时否决本次切换（如「至少保留一个」约束），保持原状
+            if (canChange(next)) {
+                checked = next
+                set(next)
+            }
         },
         modifier = Modifier.fillMaxWidth()
     ) {
@@ -286,7 +355,7 @@ private fun TvSwitchRow(
                 summary?.let { Text(text = it, color = Color(0xFF9A9A9A), fontSize = 13.sp) }
             }
             Text(
-                text = if (checked) "开" else "关",
+                text = if (checked) onLabel else offLabel,
                 color = if (checked) MaterialTheme.colorScheme.primary else Color(0xFF9A9A9A)
             )
         }
