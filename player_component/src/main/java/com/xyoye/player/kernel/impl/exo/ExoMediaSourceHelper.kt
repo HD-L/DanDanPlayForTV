@@ -9,6 +9,7 @@ import com.google.android.exoplayer2.source.MediaSource
 import com.google.android.exoplayer2.source.ProgressiveMediaSource
 import com.google.android.exoplayer2.source.dash.DashMediaSource
 import com.google.android.exoplayer2.source.hls.HlsMediaSource
+import com.google.android.exoplayer2.source.rtsp.RtspMediaSource
 import com.google.android.exoplayer2.source.smoothstreaming.SsMediaSource
 import com.google.android.exoplayer2.upstream.DataSource
 import com.google.android.exoplayer2.upstream.DefaultDataSource
@@ -56,6 +57,13 @@ object ExoMediaSourceHelper {
 
         if ("rtmp" == contentUri.scheme) {
             return ProgressiveMediaSource.Factory(RtmpDataSource.Factory())
+                .createMediaSource(mediaItem)
+        }
+
+        // RTSP 走专用 MediaSource（HTTP 数据源无法解析 rtsp:// 协议）；强制 TCP 以兼容更多设备/NAT 环境
+        if ("rtsp" == contentUri.scheme) {
+            return RtspMediaSource.Factory()
+                .setForceUseRtpTcp(true)
                 .createMediaSource(mediaItem)
         }
 

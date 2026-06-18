@@ -49,6 +49,7 @@ dependencies {
     implementation(Dependencies.Google.exoplayer_hls)
     implementation(Dependencies.Google.exoplayer_smoothstraming)
     implementation(Dependencies.Google.exoplayer_rtmp)
+    implementation(Dependencies.Google.exoplayer_rtsp)
 
     implementation(Dependencies.VLC.vlc)
 

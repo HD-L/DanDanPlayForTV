@@ -53,6 +53,7 @@ enum class TvSettingsSection(val title: String) {
     DANMU("弹幕设置"),
     SUBTITLE("字幕设置"),
     APP("应用设置"),
+    CACHE("缓存管理"),
 }
 
 /**
@@ -70,10 +71,8 @@ fun TvSettingsLanding(modifier: Modifier = Modifier) {
 
     val functions = remember {
         listOf(
-            SettingsDetail.Func("我的追番", "查看并管理已追的番剧") { TvAnimeListActivity.start(it, TvAnimeListMode.FOLLOW) },
-            SettingsDetail.Func("云端历史", "云端同步的播放历史") { TvAnimeListActivity.start(it, TvAnimeListMode.HISTORY) },
+            SettingsDetail.Func("媒体库管理", "添加 / 编辑 / 删除 / 刮削媒体源") { TvMediaManageActivity.start(it) },
             SettingsDetail.Func("扫描目录管理", "管理本地视频的扫描目录") { TvScanManagerActivity.start(it) },
-            SettingsDetail.Func("缓存目录管理", "管理弹幕 / 字幕等缓存目录") { TvCacheManagerActivity.start(it) },
             SettingsDetail.Func("常用文件夹", "管理常用文件夹快捷入口") { TvCommonlyFolderActivity.start(it) },
             SettingsDetail.Func("B站弹幕下载", "从哔哩哔哩下载弹幕") { TvBiliBiliDanmuActivity.start(it) },
             SettingsDetail.Func("射手字幕下载", "从射手网搜索并下载字幕") { TvShooterSubtitleActivity.start(it) },
@@ -142,6 +141,7 @@ fun TvSettingsLanding(modifier: Modifier = Modifier) {
                         TvSettingsSection.DANMU -> DanmuSettings()
                         TvSettingsSection.SUBTITLE -> SubtitleSettings()
                         TvSettingsSection.APP -> AppSettings()
+                        TvSettingsSection.CACHE -> CacheSettings()
                     }
                 }
 

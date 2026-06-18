@@ -71,12 +71,7 @@
             android:exported="false"
             android:screenOrientation="landscape" />
 
-        <!-- 原生 TV 离线管理屏：缓存目录 / 常用文件夹 / 扫描目录 -->
-        <activity
-            android:name="com.xyoye.dandanplay.ui.tv.TvCacheManagerActivity"
-            android:configChanges="orientation|screenSize|keyboardHidden"
-            android:exported="false"
-            android:screenOrientation="landscape" />
+        <!-- 原生 TV 离线管理屏：常用文件夹 / 扫描目录（缓存管理已内联进设置面板） -->
         <activity
             android:name="com.xyoye.dandanplay.ui.tv.TvCommonlyFolderActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"
@@ -101,6 +96,11 @@
             android:screenOrientation="landscape" />
         <activity
             android:name="com.xyoye.dandanplay.ui.tv.TvSettingsActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+        <activity
+            android:name="com.xyoye.dandanplay.ui.tv.TvMediaManageActivity"
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:exported="false"
             android:screenOrientation="landscape" />

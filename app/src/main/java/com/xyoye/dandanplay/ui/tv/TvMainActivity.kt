@@ -58,8 +58,10 @@ import androidx.fragment.app.commit
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Cast
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
@@ -168,8 +170,9 @@ private enum class TvDestination(val title: String, val icon: ImageVector) {
     HOME("首页", Icons.Default.Home),
     WEEKLY("每周番剧", Icons.Default.DateRange),
     HISTORY("播放历史", Icons.Default.History),
+    STREAM("串流播放", Icons.Default.Link),
+    MAGNET("磁链播放", Icons.Default.Download),
     SCREENCAST("投屏接收端", Icons.Default.Cast),
-    MEDIA("媒体库", Icons.Default.List),
 }
 
 @Composable
@@ -212,16 +215,24 @@ private fun TvMainScreen() {
 
                 TvDestination.HISTORY -> TvPlayHistoryScreen(
                     mediaType = MediaType.OTHER_STORAGE,
-                    title = "播放历史",
+                    showCloudTab = true,
+                    modifier = Modifier.fillMaxSize()
+                )
+
+                TvDestination.STREAM -> TvPlayHistoryScreen(
+                    mediaType = MediaType.STREAM_LINK,
+                    title = "串流播放",
+                    modifier = Modifier.fillMaxSize()
+                )
+
+                TvDestination.MAGNET -> TvPlayHistoryScreen(
+                    mediaType = MediaType.MAGNET_LINK,
+                    title = "磁链播放",
                     modifier = Modifier.fillMaxSize()
                 )
 
                 TvDestination.SCREENCAST -> TvScreencastReceiverScreen(
                     modifier = Modifier.fillMaxSize()
-                )
-
-                TvDestination.MEDIA -> TvMediaScreen(
-                    modifier = Modifier.fillMaxSize().padding(24.dp)
                 )
             }
         }
@@ -285,10 +296,16 @@ private fun TvNavRail(
             onClick = { onSelect(TvDestination.HISTORY) }
         )
         NavRailIcon(
-            icon = TvDestination.MEDIA.icon,
-            contentDescription = TvDestination.MEDIA.title,
-            selected = selected == TvDestination.MEDIA,
-            onClick = { onSelect(TvDestination.MEDIA) }
+            icon = TvDestination.STREAM.icon,
+            contentDescription = TvDestination.STREAM.title,
+            selected = selected == TvDestination.STREAM,
+            onClick = { onSelect(TvDestination.STREAM) }
+        )
+        NavRailIcon(
+            icon = TvDestination.MAGNET.icon,
+            contentDescription = TvDestination.MAGNET.title,
+            selected = selected == TvDestination.MAGNET,
+            onClick = { onSelect(TvDestination.MAGNET) }
         )
         // 投屏接收端：内嵌内容页（服务启停与本页宿主解耦，离开后服务照常运行）
         NavRailIcon(
@@ -421,12 +438,18 @@ private fun FragmentHost(route: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun TvMediaScreen(modifier: Modifier = Modifier) {
+internal fun TvMediaScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val mediaViewModel: MediaViewModel = viewModel()
     val scrapeViewModel: TvMediaScrapeViewModel = viewModel()
     val libraries by mediaViewModel.mediaLibWithStatusLiveData.observeAsState()
-    val list = libraries ?: emptyList()
+    // 历史记录(OTHER_STORAGE)/串流(STREAM_LINK)/磁链(MAGNET_LINK) 已各自独立为侧边栏面板，故从媒体库管理隐藏
+    val list = (libraries ?: emptyList())
+        .filterNot {
+            it.mediaType == MediaType.OTHER_STORAGE ||
+                it.mediaType == MediaType.STREAM_LINK ||
+                it.mediaType == MediaType.MAGNET_LINK
+        }
     var showAddPicker by remember { mutableStateOf(false) }
     var editState by remember { mutableStateOf<Pair<MediaType, MediaLibraryEntity?>?>(null) }
     var manageTarget by remember { mutableStateOf<MediaLibraryEntity?>(null) }

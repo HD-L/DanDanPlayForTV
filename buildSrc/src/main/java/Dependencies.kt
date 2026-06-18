@@ -113,6 +113,8 @@ object Dependencies {
             "com.google.android.exoplayer:exoplayer-smoothstreaming:${Versions.exoplayer}"
         const val exoplayer_rtmp =
             "com.google.android.exoplayer:extension-rtmp:${Versions.exoplayer}"
+        const val exoplayer_rtsp =
+            "com.google.android.exoplayer:exoplayer-rtsp:${Versions.exoplayer}"
     }
     object Huawei {
         const val scan = "com.huawei.hms:scan:1.3.1.300"

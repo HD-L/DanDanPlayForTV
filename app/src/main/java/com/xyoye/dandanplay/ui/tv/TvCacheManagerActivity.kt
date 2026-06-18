@@ -2,20 +2,11 @@
 
 package com.xyoye.dandanplay.ui.tv
 
-import android.content.Context
-import android.content.Intent
-import android.os.Bundle
-import androidx.activity.ComponentActivity
-import androidx.activity.compose.BackHandler
-import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -48,28 +39,9 @@ import kotlinx.coroutines.withContext
 import java.io.File
 
 /**
- * 原生 TV 缓存目录管理：展示系统缓存 / 各类缓存大小，逐项确认后清除。纯文件 I/O，无网络无登录。
+ * 缓存管理：展示系统缓存 / 各类缓存大小，逐项确认后清除。纯文件 I/O，无网络无登录。
+ * 作为「设置」分组下的一个详情面板内联展示（[CacheSettings]），不再是独立页面。
  */
-class TvCacheManagerActivity : ComponentActivity() {
-
-    companion object {
-        fun start(context: Context) {
-            context.startActivity(Intent(context, TvCacheManagerActivity::class.java))
-        }
-    }
-
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContent {
-            TvAppTheme {
-                Surface(modifier = Modifier.fillMaxSize()) {
-                    TvCacheManagerScreen(onExit = { finish() })
-                }
-            }
-        }
-    }
-}
-
 class TvCacheManagerViewModel : ViewModel() {
 
     private val appCacheDir = BaseApplication.getAppContext().cacheDir
@@ -180,55 +152,45 @@ class TvCacheManagerViewModel : ViewModel() {
 /** 待清理项：标题 + 确认提示 + 执行动作 */
 private data class ClearTarget(val title: String, val tips: String, val action: () -> Unit)
 
+/**
+ * 缓存管理详情面板（内联在「设置」右栏）。直接铺行（不用 LazyColumn）以适配设置右栏的整体滚动。
+ */
 @Composable
-private fun TvCacheManagerScreen(onExit: () -> Unit) {
+internal fun CacheSettings() {
     val viewModel: TvCacheManagerViewModel = viewModel()
     var pending by remember { mutableStateOf<ClearTarget?>(null) }
 
     LaunchedEffect(Unit) { viewModel.refreshCache() }
-    BackHandler(enabled = true) { onExit() }
 
-    Column(modifier = Modifier.fillMaxSize().padding(32.dp)) {
-        Text(text = if (viewModel.loading) "缓存管理（统计中…）" else "缓存管理")
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(top = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            item {
-                CacheRow(
-                    title = "系统缓存",
-                    subtitle = viewModel.systemCachePath,
-                    size = viewModel.systemCacheSize,
-                    onClick = {
-                        pending = ClearTarget("系统缓存", "清除应用的系统临时缓存，确认清除？") {
-                            viewModel.clearSystemCache()
-                        }
-                    }
-                )
-            }
-            item {
-                CacheRow(
-                    title = "缓存目录",
-                    subtitle = viewModel.externalCachePath,
-                    size = viewModel.externalCacheSize,
-                    onClick = null
-                )
-            }
-            items(viewModel.caches) { cache ->
-                val type = cache.cacheType
-                val title = type?.displayName ?: "其他缓存"
-                val countSuffix = if (cache.fileCount > 0) "（${cache.fileCount}）" else ""
-                CacheRow(
-                    title = "$title$countSuffix",
-                    subtitle = type?.dirName ?: "未归类的缓存文件",
-                    size = formatFileSize(cache.totalSize),
-                    onClick = {
-                        val tips = type?.clearTips ?: "清除其他未归类缓存，确认清除？"
-                        pending = ClearTarget(title, tips) { viewModel.clearCacheByType(type) }
-                    }
-                )
+    CacheRow(
+        title = "系统缓存",
+        subtitle = viewModel.systemCachePath,
+        size = viewModel.systemCacheSize,
+        onClick = {
+            pending = ClearTarget("系统缓存", "清除应用的系统临时缓存，确认清除？") {
+                viewModel.clearSystemCache()
             }
         }
+    )
+    CacheRow(
+        title = "缓存目录",
+        subtitle = viewModel.externalCachePath,
+        size = viewModel.externalCacheSize,
+        onClick = null
+    )
+    viewModel.caches.forEach { cache ->
+        val type = cache.cacheType
+        val title = type?.displayName ?: "其他缓存"
+        val countSuffix = if (cache.fileCount > 0) "（${cache.fileCount}）" else ""
+        CacheRow(
+            title = "$title$countSuffix",
+            subtitle = type?.dirName ?: "未归类的缓存文件",
+            size = formatFileSize(cache.totalSize),
+            onClick = {
+                val tips = type?.clearTips ?: "清除其他未归类缓存，确认清除？"
+                pending = ClearTarget(title, tips) { viewModel.clearCacheByType(type) }
+            }
+        )
     }
 
     pending?.let { target ->

@@ -4,8 +4,10 @@ package com.xyoye.dandanplay.ui.tv
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -171,6 +173,60 @@ fun TvEntryCard(label: String, onClick: () -> Unit, modifier: Modifier = Modifie
             contentAlignment = Alignment.CenterStart
         ) {
             Text(text = label, fontWeight = FontWeight.Medium)
+        }
+    }
+}
+
+/**
+ * 通用顶部选项卡行（参考 B 站 TV 顶部 tag：选中白字 + 蓝色下划线，可遥控聚焦）。
+ * 历史记录「本地/云端」、每周番剧「每周番剧/我的追番」等共用此样式。
+ */
+@Composable
+fun TvTabRow(
+    tabs: List<String>,
+    selectedIndex: Int,
+    onSelect: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        tabs.forEachIndexed { index, label ->
+            TvTabItem(label = label, selected = index == selectedIndex, onClick = { onSelect(index) })
+        }
+    }
+}
+
+@Composable
+private fun TvTabItem(label: String, selected: Boolean, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(8.dp)),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = Color(0x00000000),
+            contentColor = if (selected) Color.White else Color(0xFF9A9A9A),
+            focusedContainerColor = Color(0x26FFFFFF),
+            focusedContentColor = Color.White
+        )
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp)
+        ) {
+            Text(
+                text = label,
+                fontSize = 20.sp,
+                fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+            )
+            Box(
+                modifier = Modifier
+                    .padding(top = 5.dp)
+                    .height(3.dp)
+                    .width(26.dp)
+                    .background(if (selected) Color(0xFF3F8CFF) else Color(0x00000000))
+            )
         }
     }
 }

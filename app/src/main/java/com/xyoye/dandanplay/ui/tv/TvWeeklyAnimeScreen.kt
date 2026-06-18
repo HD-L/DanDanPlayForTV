@@ -6,15 +6,23 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items as gridItems
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -28,46 +36,31 @@ import com.xyoye.data_component.data.AnimeData
 import java.util.Calendar
 
 /**
- * 独立的「每周番剧」周表页（由左侧导航栏的专用按钮进入）。
- *
- * 复用 [TvAnimeViewModel] 已按星期分组好的 [TvAnimeViewModel.weekly]
- * （标签「周日」…「周六」，空的星期省略，日历顺序），每个星期一行横向海报墙。
- * 初始焦点落在「今日」那一行的首张卡片，列表会自动滚动到今天（复刻手机版默认定位当天的行为）。
+ * 番剧页：顶部「每周番剧 / 我的追番」选项卡（参考历史记录的 tag 形式），默认每周番剧。
+ * - 每周番剧：复用 [TvAnimeViewModel.weekly]（按星期分组，今日前置 + 自动定位）。
+ * - 我的追番：DanDanPlay 云端关注列表（需登录 + 开发者凭据）。
+ * 两个标签页共用同一套番剧详情弹窗。
  */
 @Composable
 fun TvWeeklyAnimeScreen(modifier: Modifier = Modifier) {
     val animeViewModel: TvAnimeViewModel = viewModel()
-    val weekly = animeViewModel.weekly
-    val todayLabel = remember { todayWeekdayLabel() }
-    val todayFocus = remember { FocusRequester() }
+    var tab by remember { mutableStateOf(0) }   // 0=每周番剧, 1=我的追番
 
-    LaunchedEffect(Unit) { animeViewModel.loadWeekly() }
-
-    Column(modifier = modifier.fillMaxSize()) {
-        Text(
-            text = "每周番剧",
-            modifier = Modifier.padding(start = 32.dp, top = 28.dp, bottom = 10.dp)
+    Column(
+        modifier = modifier
+            .fillMaxSize()
+            .padding(start = 32.dp, top = 24.dp, end = 32.dp, bottom = 24.dp)
+    ) {
+        TvTabRow(
+            tabs = listOf("每周番剧", "我的追番"),
+            selectedIndex = tab,
+            onSelect = { tab = it }
         )
-
-        if (weekly.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text(text = "正在加载本周新番…", color = Color(0xFF9A9A9A))
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(top = 8.dp, bottom = 32.dp),
-                verticalArrangement = Arrangement.spacedBy(22.dp)
-            ) {
-                items(weekly) { (label, list) ->
-                    val isToday = label == todayLabel
-                    WeeklyShelf(
-                        title = if (isToday) "$label · 今日新番" else label,
-                        items = list,
-                        onClick = { animeViewModel.openDetail(it.animeId) },
-                        firstCardFocus = if (isToday) todayFocus else null
-                    )
-                }
+        Spacer(modifier = Modifier.height(16.dp))
+        Box(modifier = Modifier.fillMaxSize()) {
+            when (tab) {
+                0 -> WeeklyContent(animeViewModel)
+                else -> FollowAnimeContent(animeViewModel)
             }
         }
     }
@@ -75,11 +68,79 @@ fun TvWeeklyAnimeScreen(modifier: Modifier = Modifier) {
     animeViewModel.detail?.let { bangumi ->
         AnimeDetailDialog(bangumi = bangumi, onDismiss = { animeViewModel.closeDetail() })
     }
+}
 
-    // 数据就绪后，把焦点落到「今日」首张卡片，使列表自动滚到今天
+/** 每周番剧：按星期分组的横向海报墙，初始焦点落在「今日」行使列表自动滚到今天。 */
+@Composable
+private fun WeeklyContent(animeViewModel: TvAnimeViewModel) {
+    val weekly = animeViewModel.weekly
+    val todayLabel = remember { todayWeekdayLabel() }
+    val todayFocus = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) { animeViewModel.loadWeekly() }
+
+    if (weekly.isEmpty()) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text(text = "正在加载本周新番…", color = Color(0xFF9A9A9A))
+        }
+    } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(top = 4.dp, bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(22.dp)
+        ) {
+            items(weekly) { (label, list) ->
+                val isToday = label == todayLabel
+                WeeklyShelf(
+                    title = if (isToday) "$label · 今日新番" else label,
+                    items = list,
+                    onClick = { animeViewModel.openDetail(it.animeId) },
+                    firstCardFocus = if (isToday) todayFocus else null
+                )
+            }
+        }
+    }
+
     LaunchedEffect(weekly, todayLabel) {
         if (weekly.any { it.first == todayLabel }) {
             runCatching { todayFocus.requestFocus() }
+        }
+    }
+}
+
+/** 我的追番：云端关注列表海报网格。用独立 key 的 ViewModel，避免与「云端历史」的一次性加载守卫冲突。 */
+@Composable
+private fun FollowAnimeContent(animeViewModel: TvAnimeViewModel) {
+    val listViewModel: TvAnimeListViewModel = viewModel(key = "follow_anime")
+
+    LaunchedEffect(Unit) { listViewModel.load(TvAnimeListMode.FOLLOW) }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        when {
+            listViewModel.loading && listViewModel.items.isEmpty() ->
+                Text(text = "加载中…", modifier = Modifier.align(Alignment.Center))
+
+            listViewModel.items.isEmpty() ->
+                Text(
+                    text = "暂无追番\n（需登录并配置开发者凭据，否则接口返回 403）",
+                    color = Color(0xFFB5B5B5),
+                    modifier = Modifier.align(Alignment.Center)
+                )
+
+            else -> LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 150.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalArrangement = Arrangement.spacedBy(20.dp),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                gridItems(listViewModel.items) { anime ->
+                    TvPosterCard(
+                        imageUrl = anime.imageUrl,
+                        title = anime.animeTitle ?: "",
+                        onClick = { animeViewModel.openDetail(anime.animeId) }
+                    )
+                }
+            }
         }
     }
 }
@@ -92,9 +153,9 @@ private fun WeeklyShelf(
     firstCardFocus: FocusRequester? = null
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(text = title, modifier = Modifier.padding(start = 32.dp))
+        Text(text = title, modifier = Modifier.padding(start = 4.dp))
         LazyRow(
-            contentPadding = PaddingValues(horizontal = 32.dp),
+            contentPadding = PaddingValues(horizontal = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             itemsIndexed(items) { index, anime ->
