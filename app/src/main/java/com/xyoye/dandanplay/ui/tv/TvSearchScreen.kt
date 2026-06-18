@@ -2,6 +2,11 @@
 
 package com.xyoye.dandanplay.ui.tv
 
+import android.content.Context
+import android.content.Intent
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,9 +31,33 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.tv.material3.Button
 import androidx.tv.material3.ExperimentalTvMaterial3Api
+import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import com.xyoye.data_component.data.AnimeData
 import com.xyoye.data_component.entity.ScrapedAnimeEntity
+
+/**
+ * 番剧/全局搜索独立页：由「番剧」面板的搜索按钮点击打开（替代原嵌入式面板），按返回键退出。
+ */
+class TvSearchActivity : ComponentActivity() {
+
+    companion object {
+        fun start(context: Context) {
+            context.startActivity(Intent(context, TvSearchActivity::class.java))
+        }
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            TvAppTheme {
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    TvSearchScreen(modifier = Modifier.fillMaxSize())
+                }
+            }
+        }
+    }
+}
 
 /**
  * 全局搜索：同时搜「本地刮削媒体」（内存过滤）与「在线番剧」（AnimeRepository）。风格与海报墙统一。
