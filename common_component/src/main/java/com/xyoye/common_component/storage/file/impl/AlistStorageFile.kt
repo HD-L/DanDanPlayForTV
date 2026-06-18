@@ -23,6 +23,11 @@ class AlistStorageFile(
     }
 
     override fun filePath(): String {
+        // 优先使用 Alist 返回的真实路径（含 base_path 前缀，如 /mnt/...），fs/get 必须用它；
+        // 根目录等无 path 时回退为父目录+文件名
+        if (fileData.path.isNotEmpty()) {
+            return fileData.path
+        }
         val uriBuilder = Uri.Builder().encodedPath(parentPath)
         if (fileName().startsWith(File.separator)) {
             uriBuilder.encodedPath(fileName())

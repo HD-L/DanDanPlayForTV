@@ -9,6 +9,7 @@ import com.xyoye.data_component.bean.VideoTrackBean
 import com.xyoye.data_component.data.DanmuEpisodeData
 import com.xyoye.data_component.entity.DanmuBlockEntity
 import com.xyoye.data_component.enums.PlayState
+import com.xyoye.data_component.enums.SettingViewType
 import com.xyoye.player.controller.base.GestureVideoController
 import com.xyoye.player.controller.danmu.DanmuController
 import com.xyoye.player.controller.setting.SettingController
@@ -151,6 +152,24 @@ class VideoController(
      */
     fun setVideoTitle(title: String?) {
         playerTopView.setVideoTitle(title)
+    }
+
+    /**
+     * 打开播放设置主面板（弹幕轨/字幕轨/音轨、弹幕配置、关键词屏蔽、样式、截屏等原有功能）。
+     * 供原生 TV 控制覆盖层调用，复用现有设置面板。
+     */
+    fun showPlayerSetting() {
+        runCatching { mControlWrapper.showSettingView(SettingViewType.PLAYER_SETTING, null) }
+    }
+
+    /** 设置面板是否正在显示（TV 覆盖层据此让出 D-pad 给设置面板） */
+    fun isSettingShowing(): Boolean {
+        return runCatching { mControlWrapper.isSettingViewShowing() }.getOrDefault(false)
+    }
+
+    /** 切换弹幕显示/隐藏（TV 控制栏弹幕开关） */
+    fun toggleDanmuVisible() {
+        runCatching { mControlWrapper.toggleDanmuVisible() }
     }
 
     /**

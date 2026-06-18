@@ -169,6 +169,50 @@ class DatabaseManager private constructor() {
             }
         }
 
+        val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // 刮削番剧元数据表（海报）
+                database.execSQL(
+                    "CREATE TABLE scraped_anime(" +
+                            "anime_id INTEGER NOT NULL PRIMARY KEY," +
+                            "title TEXT NOT NULL," +
+                            "image_url TEXT," +
+                            "type TEXT," +
+                            "type_description TEXT," +
+                            "rating REAL NOT NULL," +
+                            "updated_at INTEGER NOT NULL" +
+                            ")"
+                )
+                // 刮削分集（文件）表
+                database.execSQL(
+                    "CREATE TABLE scraped_episode(" +
+                            "id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT," +
+                            "storage_id INTEGER NOT NULL," +
+                            "unique_key TEXT NOT NULL," +
+                            "file_name TEXT NOT NULL," +
+                            "storage_path TEXT," +
+                            "anime_id INTEGER NOT NULL," +
+                            "anime_title TEXT," +
+                            "episode_id TEXT," +
+                            "episode_title TEXT," +
+                            "status TEXT NOT NULL," +
+                            "scraped_at INTEGER NOT NULL" +
+                            ")"
+                )
+                database.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_scraped_episode_unique_key_storage_id " +
+                            "ON scraped_episode(unique_key, storage_id)"
+                )
+            }
+        }
+
+        val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // 刮削番剧表新增简介列（详情页展示）
+                database.execSQL("ALTER TABLE scraped_anime ADD COLUMN summary TEXT")
+            }
+        }
+
         val instance = DatabaseManager.holder.database
     }
 
@@ -192,7 +236,9 @@ class DatabaseManager private constructor() {
         MIGRATION_9_10,
         MIGRATION_10_11,
         MIGRATION_11_12,
-        MIGRATION_12_13
+        MIGRATION_12_13,
+        MIGRATION_13_14,
+        MIGRATION_14_15
     ).build()
 
 }

@@ -35,6 +35,14 @@ android {
             isUniversalApk = true
         }
     }
+
+    buildFeatures {
+        compose = true
+    }
+
+    composeOptions {
+        kotlinCompilerExtensionVersion = Dependencies.Compose.compilerExtension
+    }
 }
 
 kapt {
@@ -50,6 +58,21 @@ dependencies {
     implementation(project(":user_component"))
     implementation(project(":local_component"))
     implementation(project(":storage_component"))
+
+    // Compose for TV（10 尺界面）
+    implementation(platform(Dependencies.Compose.bom))
+    implementation(Dependencies.Compose.ui)
+    implementation(Dependencies.Compose.foundation)
+    implementation(Dependencies.Compose.material3)
+    implementation(Dependencies.Compose.tv_material)
+    implementation(Dependencies.Compose.tv_foundation)
+    implementation(Dependencies.Compose.activity)
+    implementation(Dependencies.Compose.viewmodel)
+    implementation(Dependencies.Compose.navigation)
+    implementation(Dependencies.Compose.runtime_livedata)
+    implementation(Dependencies.Compose.ui_tooling_preview)
+    implementation(Dependencies.Github.coil_compose)
+    debugImplementation(Dependencies.Compose.ui_tooling)
 
     kapt(Dependencies.Alibaba.arouter_compiler)
 }

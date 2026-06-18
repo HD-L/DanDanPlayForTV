@@ -107,12 +107,7 @@ class ScanWindowView : View {
         super.onDetachedFromWindow()
     }
 
-    override fun onDraw(canvas: Canvas?) {
-        if (canvas == null) {
-            super.onDraw(canvas)
-            return
-        }
-
+    override fun onDraw(canvas: Canvas) {
         val frameSize = getFrameSize()
 
         //清空扫描框背景

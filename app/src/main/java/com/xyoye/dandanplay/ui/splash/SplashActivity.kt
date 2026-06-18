@@ -15,7 +15,7 @@ import com.xyoye.common_component.base.BaseAppCompatActivity
 import com.xyoye.common_component.config.AppConfig
 import com.xyoye.dandanplay.R
 import com.xyoye.dandanplay.databinding.ActivitySplashBinding
-import com.xyoye.dandanplay.ui.main.MainActivity
+import com.xyoye.dandanplay.ui.tv.TvMainActivity
 import com.xyoye.dandanplay.utils.image_anim.path.TextPathAnimView
 
 /**
@@ -98,7 +98,8 @@ class SplashActivity : BaseAppCompatActivity<ActivitySplashBinding>() {
     }
 
     private fun launchActivity() {
-        val intent = Intent(this@SplashActivity, MainActivity::class.java)
+        // 纯 TV：进入 Compose 重建的 TV 主界面（替代原手机端 MainActivity）
+        val intent = Intent(this@SplashActivity, TvMainActivity::class.java)
         startActivity(intent)
         overridePendingTransition(R.anim.anim_activity_enter, R.anim.anim_activity_exit)
         finish()

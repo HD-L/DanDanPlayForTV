@@ -15,6 +15,14 @@ android {
         }
     }
     namespace = "com.xyoye.player_component"
+
+    // 原生 TV 播放器控制层（Compose 覆盖层）
+    buildFeatures {
+        compose = true
+    }
+    composeOptions {
+        kotlinCompilerExtensionVersion = Dependencies.Compose.compilerExtension
+    }
 }
 
 kapt {
@@ -43,6 +51,15 @@ dependencies {
     implementation(Dependencies.Google.exoplayer_rtmp)
 
     implementation(Dependencies.VLC.vlc)
+
+    // Compose for TV：播放器控制覆盖层
+    implementation(platform(Dependencies.Compose.bom))
+    implementation(Dependencies.Compose.ui)
+    implementation(Dependencies.Compose.foundation)
+    implementation(Dependencies.Compose.material3)
+    implementation(Dependencies.Compose.material_icons)
+    implementation(Dependencies.Compose.activity)
+    implementation(Dependencies.Compose.runtime_livedata)
 
     kapt(Dependencies.Alibaba.arouter_compiler)
 }

@@ -11,8 +11,19 @@
     </data>
 
     <FrameLayout
-        android:id="@+id/player_container"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="@color/player_bg_color"/>
+        android:layout_height="match_parent">
+
+        <FrameLayout
+            android:id="@+id/player_container"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/player_bg_color" />
+
+        <!-- 原生 TV 播放控制覆盖层（Compose） -->
+        <androidx.compose.ui.platform.ComposeView
+            android:id="@+id/tv_control_overlay"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent" />
+    </FrameLayout>
 </layout>

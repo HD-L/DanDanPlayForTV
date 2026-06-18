@@ -27,19 +27,21 @@ object AlistRepository : BaseRepository() {
         }
 
     /**
-     * 打开文件夹
+     * 打开文件夹（password 为 Alist 目录 meta 密码，受密码保护的目录需要）
      */
-    suspend fun openDirectory(url: String, token: String, path: String) = request()
+    suspend fun openDirectory(url: String, token: String, path: String, password: String? = null) = request()
         .param("path", path)
+        .param("password", password ?: "")
         .doPost {
             Retrofit.alistService.openDirectory(url, token, it)
         }
 
     /**
-     * 打开文件夹
+     * 打开文件（获取下载地址，password 为 Alist 目录 meta 密码）
      */
-    suspend fun openFile(url: String, token: String, path: String) = request()
+    suspend fun openFile(url: String, token: String, path: String, password: String? = null) = request()
         .param("path", path)
+        .param("password", password ?: "")
         .doPost {
             Retrofit.alistService.openFile(url, token, it)
         }

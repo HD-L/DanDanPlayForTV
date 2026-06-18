@@ -24,6 +24,8 @@
         <activity
             android:name="com.xyoye.dandanplay.ui.splash.SplashActivity"
             android:configChanges="orientation|screenSize"
+            android:exported="true"
+            android:screenOrientation="landscape"
             android:theme="@style/SplashTheme"
             android:banner="@mipmap/ic_leanback_banner">
             <intent-filter>
@@ -40,9 +42,98 @@
 
         </activity>
 
+        <!-- Phase 1：Compose 重建的 TV 主界面，替代手机端 MainActivity，全局锁横屏 -->
+        <activity
+            android:name="com.xyoye.dandanplay.ui.tv.TvMainActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:screenOrientation="landscape" />
+
+        <!-- Phase 2b：原生 Compose TV 文件浏览 -->
+        <activity
+            android:name="com.xyoye.dandanplay.ui.tv.TvStorageFileActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <!-- 原生 TV 播放历史 / 串流 / 磁链 -->
+        <activity
+            android:name="com.xyoye.dandanplay.ui.tv.TvPlayHistoryActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <!-- 原生 TV 影视详情页（海报墙点击进入） -->
+        <activity
+            android:name="com.xyoye.dandanplay.ui.tv.TvAnimeDetailActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <!-- 原生 TV 离线管理屏：缓存目录 / 常用文件夹 / 扫描目录 -->
+        <activity
+            android:name="com.xyoye.dandanplay.ui.tv.TvCacheManagerActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+        <activity
+            android:name="com.xyoye.dandanplay.ui.tv.TvCommonlyFolderActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+        <activity
+            android:name="com.xyoye.dandanplay.ui.tv.TvScanManagerActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <!-- 原生 TV 投屏接收端 / 番剧网格(追番·云端历史) -->
+        <activity
+            android:name="com.xyoye.dandanplay.ui.tv.TvScreencastReceiverActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+        <activity
+            android:name="com.xyoye.dandanplay.ui.tv.TvAnimeListActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <!-- 原生 TV 登录 / 账号信息 -->
+        <activity
+            android:name="com.xyoye.dandanplay.ui.tv.TvLoginActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+        <activity
+            android:name="com.xyoye.dandanplay.ui.tv.TvUserInfoActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <!-- 原生 TV B站弹幕下载 / 射手字幕下载 -->
+        <activity
+            android:name="com.xyoye.dandanplay.ui.tv.TvBiliBiliDanmuActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+        <activity
+            android:name="com.xyoye.dandanplay.ui.tv.TvShooterSubtitleActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="false"
+            android:screenOrientation="landscape" />
+
+        <!-- 原手机端主界面，暂保留以便对比，纯 TV 化完成后可移除 -->
         <activity
             android:name="com.xyoye.dandanplay.ui.main.MainActivity"
             android:launchMode="singleTask" />
+
+        <!-- Compose for TV 接入冒烟测试，不接入启动流程，仅供 adb 单独启动验证 -->
+        <activity
+            android:name="com.xyoye.dandanplay.ui.tv.TvComposeSmokeActivity"
+            android:exported="false"
+            android:screenOrientation="landscape" />
     </application>
 
 </manifest>

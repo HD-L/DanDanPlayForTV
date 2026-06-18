@@ -26,6 +26,10 @@ data class AlistFileData constructor(
     @NullToEmptyString
     val thumb: String = "",
 
-    val size: Long = 0L
+    val size: Long = 0L,
+
+    // Alist 返回的真实路径（含 base_path 前缀，如 /mnt/...），fs/get 必须用它
+    @NullToEmptyString
+    val path: String = ""
 
 ) : Parcelable

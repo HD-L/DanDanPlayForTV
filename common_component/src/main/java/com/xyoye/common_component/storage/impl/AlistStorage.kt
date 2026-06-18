@@ -25,7 +25,7 @@ class AlistStorage(
     private val rootUrl by lazy { rootUri.toString() }
 
     override suspend fun listFiles(file: StorageFile): List<StorageFile> {
-        return AlistRepository.openDirectory(rootUrl, token, file.filePath())
+        return AlistRepository.openDirectory(rootUrl, token, file.filePath(), library.password)
             .getOrNull()
             ?.successData
             ?.fileList
@@ -70,7 +70,7 @@ class AlistStorage(
         val pathUri = Uri.parse(path)
         val fileName = pathUri.lastPathSegment
         val parentPath = pathUri.path?.removeSuffix("/$fileName") ?: "/"
-        return AlistRepository.openFile(rootUrl, token, path)
+        return AlistRepository.openFile(rootUrl, token, path, library.password)
             .getOrNull()
             ?.successData
             ?.let {
@@ -108,7 +108,7 @@ class AlistStorage(
             return rawUrl
         }
 
-        return AlistRepository.openFile(rootUrl, token, file.filePath())
+        return AlistRepository.openFile(rootUrl, token, file.filePath(), library.password)
             .getOrNull()
             ?.successData
             ?.rawUrl

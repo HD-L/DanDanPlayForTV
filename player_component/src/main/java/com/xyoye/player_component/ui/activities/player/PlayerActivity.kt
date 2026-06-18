@@ -48,6 +48,9 @@ import com.xyoye.data_component.enums.VLCPixelFormat
 import com.xyoye.player.DanDanVideoPlayer
 import com.xyoye.player.controller.VideoController
 import com.xyoye.player.info.PlayerInitializer
+import com.xyoye.player_component.ui.tv.TvPlayerControlOverlay
+import com.xyoye.player_component.ui.tv.TvPlayerController
+import com.xyoye.player_component.ui.tv.TvPlayerUiState
 import com.xyoye.player_component.BR
 import com.xyoye.player_component.R
 import com.xyoye.player_component.databinding.ActivityPlayerBinding
@@ -91,6 +94,20 @@ class PlayerActivity : BaseActivity<PlayerViewModel, ActivityPlayerBinding>(),
 
     private var videoSource: BaseVideoSource? = null
 
+    //原生 TV 播放控制覆盖层
+    private val tvUiState = TvPlayerUiState()
+    private val tvControl by lazy {
+        TvPlayerController(
+            state = tvUiState,
+            player = danDanPlayer,
+            scope = lifecycleScope,
+            onSwitchEpisode = { delta -> tvSwitchEpisode(delta) },
+            isSettingShowing = { videoController.isSettingShowing() },
+            onOpenSettings = { videoController.showPlayerSetting() },
+            onToggleDanmu = { videoController.toggleDanmuVisible() }
+        )
+    }
+
     //电量管理
     private var batteryHelper = BatteryHelper()
 
@@ -126,6 +143,14 @@ class PlayerActivity : BaseActivity<PlayerViewModel, ActivityPlayerBinding>(),
         danDanPlayer.setController(videoController)
         dataBinding.playerContainer.removeAllViews()
         dataBinding.playerContainer.addView(danDanPlayer)
+
+        // 原生 TV 控制覆盖层：不抢焦点，按键由 Activity.onKeyDown 统一驱动
+        dataBinding.tvControlOverlay.apply {
+            isFocusable = false
+            descendantFocusability = android.view.ViewGroup.FOCUS_BLOCK_DESCENDANTS
+            setContent { TvPlayerControlOverlay(tvUiState) }
+        }
+        tvControl.startSync()
 
         // 在控制器完成初始化并与播放器绑定后，再创建弹幕配置接收器
         danmuConfigReceiver = PlayerDanmuConfigReceiver(videoController)
@@ -171,11 +196,23 @@ class PlayerActivity : BaseActivity<PlayerViewModel, ActivityPlayerBinding>(),
 
     @Deprecated("Deprecated in Java")
     override fun onBackPressed() {
+        if (tvControl.onBack()) {
+            return
+        }
         if (danDanPlayer.onBackPressed()) {
             return
         }
         danDanPlayer.recordPlayInfo()
         finish()
+    }
+
+    // 用 dispatchKeyEvent 在分发给焦点视图前拦截 D-pad：DPAD_CENTER 会被获焦视图当作点击先消费，
+    // 走 onKeyDown 太晚收不到，故在此统一交给 TV 控制覆盖层处理。
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_DOWN && tvControl.handleKey(event.keyCode)) {
+            return true
+        }
+        return super.dispatchKeyEvent(event)
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
@@ -463,6 +500,29 @@ private fun updatePlayer(source: BaseVideoSource) {
         val source = videoSource ?: return
         if (source is StorageVideoSource && source.getMediaType() == MediaType.MAGNET_LINK) {
             PlayTaskBridge.sendTaskRemoveMsg(source.getPlayTaskId())
+        }
+    }
+
+    /** 原生 TV 控制层切换上/下一集（delta=-1/1） */
+    private fun tvSwitchEpisode(delta: Int) {
+        val source = videoSource ?: return
+        val target = source.getGroupIndex() + delta
+        if (target < 0 || target >= source.getGroupSize()) {
+            ToastCenter.showOriginalToast(if (delta > 0) "已经是最后一集" else "已经是第一集")
+            return
+        }
+        showLoading()
+        danDanPlayer.pause()
+        lifecycleScope.launch(Dispatchers.IO) {
+            val targetSource = source.indexSource(target)
+            withContext(Dispatchers.Main) {
+                hideLoading()
+                if (targetSource != null) {
+                    applyPlaySource(targetSource)
+                } else {
+                    ToastCenter.showOriginalToast("无法切换分集")
+                }
+            }
         }
     }
 

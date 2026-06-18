@@ -92,7 +92,7 @@ abstract class GestureVideoController(
     }
 
     override fun onFling(
-        e1: MotionEvent,
+        e1: MotionEvent?,
         e2: MotionEvent,
         velocityX: Float,
         velocityY: Float
@@ -139,11 +139,15 @@ abstract class GestureVideoController(
     }
 
     override fun onScroll(
-        e1: MotionEvent,
+        e1: MotionEvent?,
         e2: MotionEvent,
         distanceX: Float,
         distanceY: Float
     ): Boolean {
+        // compileSdk 34 起 onScroll 的首个事件参数可空
+        if (e1 == null) {
+            return false
+        }
         if (isPopupMode()) {
             return false
         }
