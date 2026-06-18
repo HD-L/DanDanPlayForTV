@@ -9,6 +9,7 @@ import com.xyoye.common_component.database.dao.MagnetScreenDao
 import com.xyoye.common_component.database.dao.MagnetSearchHistoryDao
 import com.xyoye.common_component.database.dao.MediaLibraryDao
 import com.xyoye.common_component.database.dao.PlayHistoryDao
+import com.xyoye.common_component.database.dao.ScrapeTaskDao
 import com.xyoye.common_component.database.dao.ScrapedMediaDao
 import com.xyoye.common_component.database.dao.VideoDao
 import com.xyoye.data_component.entity.AnimeSearchHistoryEntity
@@ -18,6 +19,7 @@ import com.xyoye.data_component.entity.MagnetScreenEntity
 import com.xyoye.data_component.entity.MagnetSearchHistoryEntity
 import com.xyoye.data_component.entity.MediaLibraryEntity
 import com.xyoye.data_component.entity.PlayHistoryEntity
+import com.xyoye.data_component.entity.ScrapeTaskEntity
 import com.xyoye.data_component.entity.ScrapedAnimeEntity
 import com.xyoye.data_component.entity.ScrapedEpisodeEntity
 import com.xyoye.data_component.entity.VideoEntity
@@ -37,9 +39,10 @@ import com.xyoye.data_component.entity.VideoEntity
         DanmuBlockEntity::class,
         ExtendFolderEntity::class,
         ScrapedAnimeEntity::class,
-        ScrapedEpisodeEntity::class
+        ScrapedEpisodeEntity::class,
+        ScrapeTaskEntity::class
     ],
-    version = 15,
+    version = 16,
     exportSchema = false
 )
 abstract class DatabaseInfo : RoomDatabase() {
@@ -61,4 +64,6 @@ abstract class DatabaseInfo : RoomDatabase() {
     abstract fun getExtendFolderDao(): ExtendFolderDao
 
     abstract fun getScrapedMediaDao(): ScrapedMediaDao
+
+    abstract fun getScrapeTaskDao(): ScrapeTaskDao
 }

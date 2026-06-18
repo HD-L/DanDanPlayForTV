@@ -3,6 +3,7 @@
 package com.xyoye.dandanplay.ui.tv
 
 import android.content.Context
+import android.os.Environment
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -56,6 +57,8 @@ enum class TvSettingsSection(val title: String) {
     DANMU("弹幕设置"),
     SUBTITLE("字幕设置"),
     APP("应用设置"),
+    SCRAPE("刮削设置"),
+    COMMON_FOLDER("常用文件夹"),
     CACHE("缓存管理"),
 }
 
@@ -75,8 +78,7 @@ fun TvSettingsLanding(modifier: Modifier = Modifier) {
     val functions = remember {
         listOf(
             SettingsDetail.Func("媒体库管理", "添加 / 编辑 / 删除 / 刮削媒体源") { TvMediaManageActivity.start(it) },
-            SettingsDetail.Func("扫描目录管理", "管理本地视频的扫描目录") { TvScanManagerActivity.start(it) },
-            SettingsDetail.Func("常用文件夹", "管理常用文件夹快捷入口") { TvCommonlyFolderActivity.start(it) },
+            // 「扫描目录管理」独立入口已移除：改由 本地媒体库 → 编辑 进入
             SettingsDetail.Func("B站弹幕下载", "从哔哩哔哩下载弹幕") { TvBiliBiliDanmuActivity.start(it) },
             // 「射手字幕下载」入口已移除：密钥配置改到「字幕设置」的 API 密钥 item；搜索下载待挪进播放器字幕菜单。
         )
@@ -145,6 +147,8 @@ fun TvSettingsLanding(modifier: Modifier = Modifier) {
                         TvSettingsSection.DANMU -> DanmuSettings()
                         TvSettingsSection.SUBTITLE -> SubtitleSettings()
                         TvSettingsSection.APP -> AppSettings()
+                        TvSettingsSection.SCRAPE -> ScrapeSettings()
+                        TvSettingsSection.COMMON_FOLDER -> CommonFolderSettings()
                         TvSettingsSection.CACHE -> CacheSettings()
                     }
                 }
@@ -320,6 +324,104 @@ private fun AppSettings() {
     TvInputRow("备用服务器地址", { AppConfig.getBackupDomain() ?: "" }, { AppConfig.putBackupDomain(it) })
     TvSwitchRow("显示隐藏文件", null, { AppConfig.isShowHiddenFile() }, { AppConfig.putShowHiddenFile(it) })
     TvSwitchRow("展示启动页动画", null, { AppConfig.isShowSplashAnimation() }, { AppConfig.putShowSplashAnimation(it) })
+}
+
+/** 刮削设置：控制刮削时每个媒体之间的接口调用间隔（节流），缓解共享凭据被限流。 */
+@Composable
+private fun ScrapeSettings() {
+    TvSelectRow(
+        label = "刮削速度（每个媒体间隔）",
+        options = listOf(
+            "不限速" to 0,
+            "1 秒 / 个" to 1000,
+            "3 秒 / 个" to 3000,
+            "5 秒 / 个" to 5000
+        ),
+        get = { AppConfig.getScrapeIntervalMs() },
+        set = { AppConfig.putScrapeIntervalMs(it) }
+    )
+}
+
+/** 常用文件夹：两个常用文件夹槽（选择 / 清除）+「记住上次打开的文件夹」开关。内嵌设置面板，原独立页 TvCommonlyFolderActivity 已下线。 */
+@Composable
+private fun CommonFolderSettings() {
+    var folder1 by remember { mutableStateOf(AppConfig.getCommonlyFolder1() ?: "") }
+    var folder2 by remember { mutableStateOf(AppConfig.getCommonlyFolder2() ?: "") }
+    var picking by remember { mutableStateOf<Int?>(null) }
+    var confirmClear by remember { mutableStateOf<Int?>(null) }
+    val defaultPath = remember { Environment.getExternalStorageDirectory().absolutePath }
+
+    CommonFolderRow(label = "常用文件夹 1", path = folder1, onPick = { picking = 1 }, onClear = { confirmClear = 1 })
+    CommonFolderRow(label = "常用文件夹 2", path = folder2, onPick = { picking = 2 }, onClear = { confirmClear = 2 })
+    TvSwitchRow("记住上次打开的文件夹", null, { AppConfig.isLastOpenFolderEnable() }, { AppConfig.putLastOpenFolderEnable(it) })
+
+    picking?.let { slot ->
+        val start = (if (slot == 1) folder1 else folder2).ifEmpty { defaultPath }
+        TvLocalFolderPickerDialog(
+            initialPath = start,
+            onDismiss = { picking = null },
+            onConfirm = { path ->
+                if (slot == 1) {
+                    AppConfig.putCommonlyFolder1(path); folder1 = path
+                } else {
+                    AppConfig.putCommonlyFolder2(path); folder2 = path
+                }
+                picking = null
+            }
+        )
+    }
+
+    confirmClear?.let { slot ->
+        Dialog(onDismissRequest = { confirmClear = null }) {
+            Surface(modifier = Modifier.fillMaxWidth(0.5f)) {
+                Column(
+                    modifier = Modifier.padding(28.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
+                    Text(text = "确认删除常用文件夹$slot？")
+                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Button(onClick = {
+                            if (slot == 1) {
+                                AppConfig.putCommonlyFolder1(""); folder1 = ""
+                            } else {
+                                AppConfig.putCommonlyFolder2(""); folder2 = ""
+                            }
+                            confirmClear = null
+                        }) { Text(text = "确认删除") }
+                        Button(onClick = { confirmClear = null }) { Text(text = "取消") }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** 常用文件夹槽：左侧大按钮（展示标签 + 当前路径，点击进文件夹选择器），有路径时右侧附「清除」。 */
+@Composable
+private fun CommonFolderRow(label: String, path: String, onPick: () -> Unit, onClear: () -> Unit) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Button(
+            onClick = onPick,
+            modifier = Modifier.fillMaxWidth(if (path.isEmpty()) 1f else 0.82f)
+        ) {
+            Column {
+                Text(text = label, maxLines = 1)
+                Text(
+                    text = if (path.isEmpty()) "路径：未设置" else "路径：$path",
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    color = Color(0xFFCFCFCF)
+                )
+            }
+        }
+        if (path.isNotEmpty()) {
+            Button(onClick = onClear) { Text(text = "清除") }
+        }
+    }
 }
 
 /* ----------------- 通用设置控件 ----------------- */

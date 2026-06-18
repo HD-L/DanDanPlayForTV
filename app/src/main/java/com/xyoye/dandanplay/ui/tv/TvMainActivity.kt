@@ -65,7 +65,6 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.lifecycle.Lifecycle
@@ -90,8 +89,9 @@ import com.xyoye.common_component.config.UserConfig
 import com.xyoye.common_component.extension.deletable
 import com.xyoye.common_component.services.ScreencastReceiveService
 import com.xyoye.common_component.utils.SecurityHelper
-import com.xyoye.common_component.utils.scraper.MediaScraper
-import com.xyoye.common_component.utils.scraper.ScrapeProgress
+import com.xyoye.common_component.utils.scraper.ScrapeManager
+import com.xyoye.data_component.entity.ScrapeTaskEntity
+import com.xyoye.data_component.entity.ScrapeTaskStatus
 import com.xyoye.common_component.application.DanDanPlay
 import com.xyoye.common_component.weight.ToastCenter
 import com.xyoye.common_component.weight.dialog.CommonDialog
@@ -166,11 +166,10 @@ class TvMainActivity : BaseAppCompatActivity<ActivityTvMainBinding>(), LoginObse
 }
 
 /**
- * 内容区目的地。设置置底（通过左侧图标导航栏切换）；搜索不在导航栏，而是从「番剧」面板顶部 tag 行的搜索按钮进入。
+ * 内容区目的地（均通过左侧图标导航栏切换）；搜索是独立页（由「番剧」面板搜索按钮打开 [TvSearchActivity]），不属于内容区目的地。
  * 用户头像不是目的地，而是触发登录弹窗 / 账号信息的独立动作。
  */
 private enum class TvDestination(val title: String, val icon: ImageVector) {
-    SEARCH("搜索", Icons.Default.Search),
     HOME("首页", Icons.Default.Home),
     WEEKLY("每周番剧", Icons.Default.DateRange),
     HISTORY("播放历史", Icons.Default.History),
@@ -197,7 +196,6 @@ private fun TvDestination.isVisible(): Boolean = when (this) {
     TvDestination.STREAM -> UiConfig.isShowStream()
     TvDestination.MAGNET -> UiConfig.isShowMagnet()
     TvDestination.SCREENCAST -> UiConfig.isShowScreencast()
-    TvDestination.SEARCH -> true
 }
 
 @Composable
@@ -251,12 +249,8 @@ private fun TvMainScreen() {
                     modifier = Modifier.fillMaxSize()
                 )
 
-                TvDestination.SEARCH -> TvSearchScreen(
-                    modifier = Modifier.fillMaxSize()
-                )
-
                 TvDestination.WEEKLY -> TvWeeklyAnimeScreen(
-                    onSearch = { selected = TvDestination.SEARCH },
+                    onSearch = { TvSearchActivity.start(context) },
                     modifier = Modifier.fillMaxSize()
                 )
 
@@ -449,8 +443,9 @@ private fun FragmentHost(route: String, modifier: Modifier = Modifier) {
 internal fun TvMediaScreen(modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val mediaViewModel: MediaViewModel = viewModel()
-    val scrapeViewModel: TvMediaScrapeViewModel = viewModel()
     val libraries by mediaViewModel.mediaLibWithStatusLiveData.observeAsState()
+    val scrapeTasks by ScrapeManager.observeTasks().observeAsState()
+    val taskByStorage = (scrapeTasks ?: emptyList()).associateBy { it.storageId }
     // 历史记录(OTHER_STORAGE)/串流(STREAM_LINK)/磁链(MAGNET_LINK) 已各自独立为侧边栏面板，故从媒体库管理隐藏
     val list = (libraries ?: emptyList())
         .filterNot {
@@ -460,7 +455,7 @@ internal fun TvMediaScreen(modifier: Modifier = Modifier) {
         }
     var showAddPicker by remember { mutableStateOf(false) }
     var editState by remember { mutableStateOf<Pair<MediaType, MediaLibraryEntity?>?>(null) }
-    var manageTarget by remember { mutableStateOf<MediaLibraryEntity?>(null) }
+    var menuTarget by remember { mutableStateOf<MediaLibraryEntity?>(null) }
 
     LaunchedEffect(Unit) {
         mediaViewModel.initLocalStorage()
@@ -489,8 +484,9 @@ internal fun TvMediaScreen(modifier: Modifier = Modifier) {
                 items(list) { library ->
                     MediaLibraryCard(
                         library = library,
-                        onClick = { openMediaLibrary(context, library, mediaViewModel) },
-                        onLongClick = { if (library.mediaType.deletable) manageTarget = library }
+                        scrapeLabel = scrapeStatusLabel(taskByStorage[library.id]),
+                        onClick = { menuTarget = library },
+                        onLongClick = { menuTarget = library }
                     )
                 }
             }
@@ -522,95 +518,71 @@ internal fun TvMediaScreen(modifier: Modifier = Modifier) {
             )
         }
 
-        manageTarget?.let { lib ->
-            ManageStorageDialog(
+        menuTarget?.let { lib ->
+            val task = taskByStorage[lib.id]
+            val scraping = task?.status == ScrapeTaskStatus.PENDING ||
+                task?.status == ScrapeTaskStatus.RUNNING
+            LibraryActionMenu(
                 library = lib,
-                scrapeable = MediaScraper.isScrapeable(lib.mediaType),
+                scrapeable = ScrapeManager.isScrapeable(lib),
+                scraping = scraping,
                 onScrape = {
-                    manageTarget = null
-                    scrapeViewModel.scrape(lib)
+                    menuTarget = null
+                    ScrapeManager.enqueue(context, lib)
+                },
+                onStopScrape = {
+                    menuTarget = null
+                    ScrapeManager.stop(context, lib.id)
+                },
+                onBrowse = {
+                    menuTarget = null
+                    openMediaLibrary(context, lib, mediaViewModel)
                 },
                 onEdit = {
-                    manageTarget = null
-                    if (lib.mediaType.tvFormSupported()) {
-                        editState = lib.mediaType to lib
-                    } else {
-                        ARouter.getInstance()
-                            .build(RouteTable.Stream.StoragePlus)
-                            .withSerializable("mediaType", lib.mediaType)
-                            .withParcelable("editData", lib)
-                            .navigation(context)
+                    menuTarget = null
+                    when {
+                        lib.mediaType == MediaType.LOCAL_STORAGE ->
+                            TvScanManagerActivity.start(context)
+                        lib.mediaType.tvFormSupported() ->
+                            editState = lib.mediaType to lib
+                        else ->
+                            ARouter.getInstance()
+                                .build(RouteTable.Stream.StoragePlus)
+                                .withSerializable("mediaType", lib.mediaType)
+                                .withParcelable("editData", lib)
+                                .navigation(context)
                     }
                 },
                 onDelete = {
-                    manageTarget = null
+                    menuTarget = null
                     mediaViewModel.deleteStorage(lib)
                 },
-                onDismiss = { manageTarget = null }
+                onDismiss = { menuTarget = null }
             )
         }
-
-        if (scrapeViewModel.scraping) {
-            ScrapeProgressDialog(progress = scrapeViewModel.progress)
-        }
     }
 }
 
-/** 媒体库逐源刮削的状态持有者；用 viewModelScope 保证刮削不随弹窗/重组取消 */
-class TvMediaScrapeViewModel : ViewModel() {
-    var scraping by mutableStateOf(false)
-        private set
-    var progress by mutableStateOf<ScrapeProgress?>(null)
-        private set
-
-    private var job: Job? = null
-
-    fun scrape(library: MediaLibraryEntity) {
-        if (scraping) return
-        scraping = true
-        progress = null
-        job = viewModelScope.launch {
-            try {
-                val result = MediaScraper.scrape(library) { progress = it }
-                ToastCenter.showSuccess("刮削完成：扫描 ${result.scanned}，识别 ${result.matched}")
-            } catch (e: Exception) {
-                e.printStackTrace()
-                ToastCenter.showError("刮削失败：${e.message}")
-            } finally {
-                scraping = false
-            }
-        }
-    }
-
-    override fun onCleared() {
-        super.onCleared()
-        job?.cancel()
-    }
+/** 媒体库列表项副标题：据刮削任务状态显示「等待刮削 / 刮削中 x/y / 刮削失败」，无任务返回 null */
+private fun scrapeStatusLabel(task: ScrapeTaskEntity?): String? = when (task?.status) {
+    ScrapeTaskStatus.PENDING -> "等待刮削…"
+    ScrapeTaskStatus.RUNNING -> "刮削中 ${task.scanned}/${task.total}　识别 ${task.matched}"
+    ScrapeTaskStatus.FAILED -> "刮削失败"
+    else -> null
 }
 
+/**
+ * 媒体库点击菜单（本地 / 网络库统一）：刮削↔停止刮削(据任务状态)、浏览文件、编辑、删除。
+ * 不可刮削类型(串流/磁链/投屏/远程)隐藏刮削项；不可删除类型(本地媒体库等)隐藏删除项。
+ */
 @Composable
-private fun ScrapeProgressDialog(progress: ScrapeProgress?) {
-    Dialog(onDismissRequest = { }) {
-        Surface(modifier = Modifier.width(460.dp)) {
-            Column(
-                modifier = Modifier.padding(28.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Text(text = "正在刮削…")
-                Text(text = "已扫描 ${progress?.scanned ?: 0}　识别 ${progress?.matched ?: 0}")
-                progress?.currentFile?.takeIf { it.isNotBlank() }?.let {
-                    Text(text = it, maxLines = 1)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ManageStorageDialog(
+private fun LibraryActionMenu(
     library: MediaLibraryEntity,
     scrapeable: Boolean,
+    scraping: Boolean,
     onScrape: () -> Unit,
+    onStopScrape: () -> Unit,
+    onBrowse: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit,
     onDismiss: () -> Unit
@@ -623,19 +595,34 @@ private fun ManageStorageDialog(
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
                 Text(text = library.displayName)
+
                 if (scrapeable) {
-                    Button(
-                        onClick = onScrape,
-                        modifier = Modifier.fillMaxWidth().focusRequester(firstFocus)
-                    ) { Text(text = "刮削此源") }
+                    if (scraping) {
+                        Button(
+                            onClick = onStopScrape,
+                            modifier = Modifier.fillMaxWidth().focusRequester(firstFocus)
+                        ) { Text(text = "停止刮削") }
+                    } else {
+                        Button(
+                            onClick = onScrape,
+                            modifier = Modifier.fillMaxWidth().focusRequester(firstFocus)
+                        ) { Text(text = "刮削") }
+                    }
                 }
+
                 Button(
-                    onClick = onEdit,
+                    onClick = onBrowse,
                     modifier = Modifier
                         .fillMaxWidth()
                         .then(if (scrapeable) Modifier else Modifier.focusRequester(firstFocus))
-                ) { Text(text = "编辑") }
-                Button(onClick = onDelete, modifier = Modifier.fillMaxWidth()) { Text(text = "删除") }
+                ) { Text(text = "浏览文件") }
+
+                Button(onClick = onEdit, modifier = Modifier.fillMaxWidth()) { Text(text = "编辑") }
+
+                if (library.mediaType.deletable) {
+                    Button(onClick = onDelete, modifier = Modifier.fillMaxWidth()) { Text(text = "删除") }
+                }
+
                 Button(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text(text = "取消") }
             }
         }
@@ -686,6 +673,7 @@ private fun AddStoragePicker(onDismiss: () -> Unit, onPick: (MediaType) -> Unit)
 @Composable
 private fun MediaLibraryCard(
     library: MediaLibraryEntity,
+    scrapeLabel: String? = null,
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
@@ -713,6 +701,9 @@ private fun MediaLibraryCard(
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 Text(text = library.displayName)
                 Text(text = library.mediaType.storageName)
+                if (scrapeLabel != null) {
+                    Text(text = scrapeLabel, color = Color(0xFF4FC3F7))
+                }
             }
         }
     }

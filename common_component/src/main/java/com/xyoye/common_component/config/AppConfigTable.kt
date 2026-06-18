@@ -50,6 +50,10 @@ object AppConfigTable {
     var lastOpenFolderEnable: Boolean = true
 
     @MMKVFiled
+    //刮削时每个媒体之间的接口调用间隔(毫秒)，节流以缓解共享凭据限流
+    var scrapeIntervalMs: Int = 1000
+
+    @MMKVFiled
     //上次搜索弹幕记录
     var lastSearchDanmuJson: String? = null
 

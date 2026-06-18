@@ -1,5 +1,6 @@
 package com.xyoye.common_component.utils.scraper
 
+import com.xyoye.common_component.config.AppConfig
 import com.xyoye.common_component.database.DatabaseManager
 import com.xyoye.common_component.network.repository.AnimeRepository
 import com.xyoye.common_component.network.repository.ResourceRepository
@@ -12,8 +13,10 @@ import com.xyoye.data_component.entity.MediaLibraryEntity
 import com.xyoye.data_component.entity.ScrapedAnimeEntity
 import com.xyoye.data_component.entity.ScrapedEpisodeEntity
 import com.xyoye.data_component.enums.MediaType
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 
@@ -21,10 +24,13 @@ import kotlinx.coroutines.withContext
  * 媒体库刮削器：遍历可列举的媒体库视频文件 → 计算前 16MB 的 MD5 → DanDanPlay 文件匹配
  * → 拉取番剧详情取海报 → 写入 scraped_anime / scraped_episode 两张表，供首页海报墙展示。
  *
- * 全部复用既有底层能力，无 UI 依赖。增量去重(已刮削的 uniqueKey 跳过)，支持协程取消。
+ * 两段式：每遍历出一个文件先插入 pending 占位行（可见 + 断点续刮），节流后调接口匹配，再 REPLACE 完善。
+ * 增量去重：仅当文件已是 matched/unmatched（完成态）才跳过；pending 行会被重新处理。
+ * 节流：每个媒体之间按 intervalMs 间隔调用接口，缓解共享凭据限流。支持协程取消。
  */
 object MediaScraper {
 
+    const val STATUS_PENDING = "pending"
     const val STATUS_MATCHED = "matched"
     const val STATUS_UNMATCHED = "unmatched"
 
@@ -41,30 +47,42 @@ object MediaScraper {
     /** 是否为可刮削（可列目录读字节）的媒体库类型 */
     fun isScrapeable(mediaType: MediaType): Boolean = SCRAPEABLE_TYPES.contains(mediaType)
 
+    /** 当前配置的接口调用间隔(毫秒)，<0 归零 */
+    private fun configuredIntervalMs(): Long = AppConfig.getScrapeIntervalMs().toLong().coerceAtLeast(0L)
+
     /** 刮削全部可刮削媒体库（首页一键刷入） */
     suspend fun scrape(onProgress: (ScrapeProgress) -> Unit = {}): ScrapeProgress =
         withContext(Dispatchers.IO) {
             val libraryDao = DatabaseManager.instance.getMediaLibraryDao()
             val libraries = SCRAPEABLE_TYPES.flatMap { libraryDao.getByMediaTypeSuspend(it) }
-            scrapeLibraries(libraries, onProgress)
+            scrapeLibraries(libraries, configuredIntervalMs(), onProgress)
         }
 
-    /** 仅刮削单个媒体库（媒体库内「刮削此源」入口） */
+    /** 仅刮削单个媒体库（媒体库内「刮削此源」入口 / 服务逐库处理） */
     suspend fun scrape(
         library: MediaLibraryEntity,
         onProgress: (ScrapeProgress) -> Unit = {}
+    ): ScrapeProgress = scrapeLibrary(library, configuredIntervalMs(), onProgress)
+
+    /** 刮削单个媒体库，可指定接口节流间隔（供刮削服务调用） */
+    suspend fun scrapeLibrary(
+        library: MediaLibraryEntity,
+        intervalMs: Long,
+        onProgress: (ScrapeProgress) -> Unit = {}
     ): ScrapeProgress = withContext(Dispatchers.IO) {
-        scrapeLibraries(listOf(library), onProgress)
+        scrapeLibraries(listOf(library), intervalMs, onProgress)
     }
 
     private suspend fun scrapeLibraries(
         libraries: List<MediaLibraryEntity>,
+        intervalMs: Long,
         onProgress: (ScrapeProgress) -> Unit
     ): ScrapeProgress {
         val scrapedDao = DatabaseManager.instance.getScrapedMediaDao()
 
         var scanned = 0
         var matched = 0
+        var total = 0
         val animeCache = HashSet<Int>()
 
         for (library in libraries) {
@@ -72,17 +90,44 @@ object MediaScraper {
             val storage = StorageFactory.createStorage(library) ?: continue
             try {
                 val videoFiles = collectVideoFiles(storage)
+                total = videoFiles.size
                 for (file in videoFiles) {
                     currentCoroutineContext().ensureActive()
                     onProgress(
-                        ScrapeProgress(library.displayName, file.fileName(), scanned, matched)
+                        ScrapeProgress(library.displayName, file.fileName(), scanned, matched, total)
                     )
 
-                    if (scrapedDao.isScraped(library.id, file.uniqueKey())) {
+                    // 仅完成态(matched/unmatched)才跳过；pending 行会被重新处理（断点续刮）
+                    val existedStatus = scrapedDao.episodeStatus(library.id, file.uniqueKey())
+                    if (existedStatus == STATUS_MATCHED || existedStatus == STATUS_UNMATCHED) {
                         scanned++
                         continue
                     }
 
+                    // 第一段：先入库 pending 占位（可见 + 可续刮）
+                    scrapedDao.insertEpisode(
+                        ScrapedEpisodeEntity(
+                            storageId = library.id,
+                            uniqueKey = file.uniqueKey(),
+                            fileName = file.fileName(),
+                            storagePath = file.storagePath(),
+                            animeId = 0,
+                            animeTitle = null,
+                            episodeId = null,
+                            episodeTitle = null,
+                            status = STATUS_PENDING,
+                            scrapedAt = currentTimeMillis()
+                        )
+                    )
+
+                    // 节流：每个媒体之间间隔调用接口
+                    if (intervalMs > 0) {
+                        delay(intervalMs)
+                    }
+
+                    currentCoroutineContext().ensureActive()
+
+                    // 第二段：匹配并 REPLACE 完善
                     val episode = runCatching { matchFile(storage, file) }.getOrNull()
                     scrapedDao.insertEpisode(
                         ScrapedEpisodeEntity(
@@ -105,6 +150,9 @@ object MediaScraper {
                     }
                     scanned++
                 }
+            } catch (e: CancellationException) {
+                // 「停止刮削」：让取消正常向上传播，由服务标记为 cancelled
+                throw e
             } catch (e: Exception) {
                 e.printStackTrace()
             } finally {
@@ -112,7 +160,7 @@ object MediaScraper {
             }
         }
 
-        return ScrapeProgress("", "", scanned, matched, finished = true)
+        return ScrapeProgress("", "", scanned, matched, total, finished = true)
     }
 
     /** 递归(BFS)收集一个媒体库下的全部视频文件 */
@@ -176,5 +224,6 @@ data class ScrapeProgress(
     val currentFile: String,
     val scanned: Int,
     val matched: Int,
+    val total: Int = 0,
     val finished: Boolean = false
 )

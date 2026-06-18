@@ -2,6 +2,8 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 刮削前台服务 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <!-- Android 12 及以下读外部存储 -->
     <uses-permission
         android:name="android.permission.READ_EXTERNAL_STORAGE"
@@ -27,6 +29,11 @@
 
         <receiver
             android:name=".receiver.NotificationReceiver"
+            android:exported="false" />
+
+        <!-- 媒体刮削前台服务 -->
+        <service
+            android:name=".services.ScrapeService"
             android:exported="false" />
 
         <provider

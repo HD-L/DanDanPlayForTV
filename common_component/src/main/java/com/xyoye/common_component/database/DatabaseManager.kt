@@ -213,6 +213,30 @@ class DatabaseManager private constructor() {
             }
         }
 
+        val MIGRATION_15_16 = object : Migration(15, 16) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // 刮削任务（队列 + 进度）表
+                database.execSQL(
+                    "CREATE TABLE scrape_task(" +
+                            "id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT," +
+                            "storage_id INTEGER NOT NULL," +
+                            "status TEXT NOT NULL," +
+                            "total INTEGER NOT NULL," +
+                            "scanned INTEGER NOT NULL," +
+                            "matched INTEGER NOT NULL," +
+                            "error TEXT," +
+                            "created_at INTEGER NOT NULL," +
+                            "started_at INTEGER NOT NULL," +
+                            "finished_at INTEGER NOT NULL" +
+                            ")"
+                )
+                database.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_scrape_task_storage_id " +
+                            "ON scrape_task(storage_id)"
+                )
+            }
+        }
+
         val instance = DatabaseManager.holder.database
     }
 
@@ -238,7 +262,8 @@ class DatabaseManager private constructor() {
         MIGRATION_11_12,
         MIGRATION_12_13,
         MIGRATION_13_14,
-        MIGRATION_14_15
+        MIGRATION_14_15,
+        MIGRATION_15_16
     ).build()
 
 }
