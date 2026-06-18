@@ -16,8 +16,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -46,6 +47,7 @@ import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import com.alibaba.android.arouter.launcher.ARouter
 import com.xyoye.common_component.config.RouteTable
+import com.xyoye.common_component.extension.toCoverFile
 import com.xyoye.data_component.entity.PlayHistoryEntity
 import com.xyoye.data_component.enums.MediaType
 import com.xyoye.local_component.ui.activities.play_history.PlayHistoryViewModel
@@ -79,8 +81,19 @@ class TvPlayHistoryActivity : ComponentActivity() {
     }
 }
 
+/**
+ * 播放历史 / 串流 / 磁链列表屏。可独立作为 Activity 内容，也可内嵌进 TV 主框架内容区。
+ *
+ * @param title    顶部标题；为空时用 [MediaType.storageName]（全局历史页传「播放历史」）。
+ * @param onExit   非空时挂 BackHandler 并在返回时回调（独立 Activity 用 finish）；内嵌进 shell 时传 null。
+ */
 @Composable
-private fun TvPlayHistoryScreen(mediaType: MediaType, onExit: () -> Unit) {
+internal fun TvPlayHistoryScreen(
+    mediaType: MediaType,
+    modifier: Modifier = Modifier,
+    title: String? = null,
+    onExit: (() -> Unit)? = null
+) {
     val context = LocalContext.current
     val viewModel: PlayHistoryViewModel = viewModel()
     val history by viewModel.historyLiveData.observeAsState()
@@ -101,14 +114,14 @@ private fun TvPlayHistoryScreen(mediaType: MediaType, onExit: () -> Unit) {
         viewModel.playLiveData.observe(lifecycleOwner, observer)
         onDispose { viewModel.playLiveData.removeObserver(observer) }
     }
-    BackHandler { onExit() }
+    BackHandler(enabled = onExit != null) { onExit?.invoke() }
 
-    Column(modifier = Modifier.fillMaxSize().padding(32.dp)) {
+    Column(modifier = modifier.fillMaxSize().padding(32.dp)) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            Text(text = mediaType.storageName)
+            Text(text = title ?: mediaType.storageName)
             if (mediaType == MediaType.STREAM_LINK) {
                 Button(onClick = { showAddLink = true }) { Text(text = "＋ 添加串流地址") }
             }
@@ -121,12 +134,21 @@ private fun TvPlayHistoryScreen(mediaType: MediaType, onExit: () -> Unit) {
             if (list.isEmpty()) {
                 Text(text = "暂无记录", modifier = Modifier.align(Alignment.Center))
             } else {
-                LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                // 海报墙风格的卡片网格：封面 + 标题 + 进度，长按管理（移除 / 解绑弹幕字幕）
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 150.dp),
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(20.dp)
+                ) {
                     items(list) { item ->
-                        HistoryRow(
-                            history = item,
+                        val percent = historyPercent(item)
+                        TvPosterCard(
+                            imageUrl = item.uniqueKey.toCoverFile()?.takeIf { it.exists() },
+                            title = item.videoName,
                             onClick = { viewModel.openHistory(item) },
-                            onLongClick = { manageTarget = item }
+                            onLongClick = { manageTarget = item },
+                            subtitle = percent?.let { "已看 $it%" },
+                            progress = percent?.let { it / 100f }
                         )
                     }
                 }
@@ -160,26 +182,10 @@ private fun TvPlayHistoryScreen(mediaType: MediaType, onExit: () -> Unit) {
     }
 }
 
-@Composable
-private fun HistoryRow(
-    history: PlayHistoryEntity,
-    onClick: () -> Unit,
-    onLongClick: () -> Unit
-) {
-    val progress = if (history.videoDuration > 0) {
-        (history.videoPosition * 100 / history.videoDuration).coerceIn(0, 100)
-    } else 0
-    Surface(onClick = onClick, onLongClick = onLongClick, modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(text = history.videoName, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(
-                text = if (progress > 0) "已看 $progress%" else history.url,
-                color = MaterialTheme.colorScheme.primary,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-    }
+/** 历史进度百分比（0~100）；无时长信息时返回 null（不显示进度）。 */
+private fun historyPercent(history: PlayHistoryEntity): Int? {
+    if (history.videoDuration <= 0) return null
+    return (history.videoPosition * 100 / history.videoDuration).toInt().coerceIn(0, 100)
 }
 
 @Composable

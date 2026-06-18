@@ -2,23 +2,24 @@
 <resources>
     <color name="theme">#2095f4</color>
 
-    <color name="text_black">#353535</color>
-    <color name="text_white">#ffffff</color>
+    <!-- 全局固定深色主题：以下颜色为唯一（深色）取值，已移除浅色变体 -->
+    <color name="text_black">#ffffff</color>
+    <color name="text_white">#353535</color>
 
     <!-- 状态栏颜色 -->
-    <color name="status_bar_color">#ffffff</color>
+    <color name="status_bar_color">#303030</color>
 
     <!-- 普通layout背景色 -->
-    <color name="layout_bg_color">#f3f3f3</color>
+    <color name="layout_bg_color">#212121</color>
     <!-- 普通item背景色 -->
-    <color name="item_bg_color">#ffffff</color>
+    <color name="item_bg_color">#303030</color>
     <!-- 搜索输入框颜色 -->
-    <color name="search_edit_text_bg_color">#4ea9f4</color>
+    <color name="search_edit_text_bg_color">#303030</color>
     <!-- 普通item边界线颜色 -->
-    <color name="item_border_color">#08000000</color>
+    <color name="item_border_color">#10ffffff</color>
 
     <!-- 普通layout背景色-浅色 -->
-    <color name="layout_bg_color_light">#77f3f3f3</color>
+    <color name="layout_bg_color_light">#77212121</color>
 
     <!-- 以下颜色不随深色模式改变 -->
     <color name="colorAccent">#2095f4</color>

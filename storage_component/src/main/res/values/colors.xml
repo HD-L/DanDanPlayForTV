@@ -7,5 +7,5 @@
     <color name="radar_scan_point_color">#5582bcf3</color>
     <color name="radar_background_line_color">#15096dbe</color>
 
-    <color name="background_screencast_device">#44cccccc</color>
+    <color name="background_screencast_device">#77000000</color>
 </resources>

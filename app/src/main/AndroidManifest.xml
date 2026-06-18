@@ -99,6 +99,11 @@
             android:configChanges="orientation|screenSize|keyboardHidden"
             android:exported="false"
             android:screenOrientation="landscape" />
+        <activity
+            android:name="com.xyoye.dandanplay.ui.tv.TvSettingsActivity"
+            android:configChanges="orientation|screenSize|keyboardHidden"
+            android:exported="false"
+            android:screenOrientation="landscape" />
 
         <!-- 原生 TV 登录 / 账号信息 -->
         <activity

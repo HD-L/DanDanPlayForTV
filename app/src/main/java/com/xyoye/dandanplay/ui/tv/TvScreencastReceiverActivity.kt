@@ -101,8 +101,18 @@ class TvScreencastReceiverViewModel : ViewModel() {
     fun randomPwd(): String = UUID.randomUUID().toString().substring(0, 8)
 }
 
+/**
+ * 投屏接收端屏。可独立作为 Activity，也可内嵌进 TV 主框架内容区。
+ * 服务启停由按钮控制、运行状态读 [ServiceLifecycleBridge] 全局 LiveData，与本屏宿主生命周期解耦，
+ * 因此内嵌进 shell 时离开本页服务照常运行（预期行为）。
+ *
+ * @param onExit 非空时挂 BackHandler 并在返回时回调（独立 Activity 用 finish）；内嵌进 shell 时传 null。
+ */
 @Composable
-private fun TvScreencastReceiverScreen(onExit: () -> Unit) {
+internal fun TvScreencastReceiverScreen(
+    modifier: Modifier = Modifier,
+    onExit: (() -> Unit)? = null
+) {
     val context = LocalContext.current
     val viewModel: TvScreencastReceiverViewModel = viewModel()
 
@@ -122,10 +132,10 @@ private fun TvScreencastReceiverScreen(onExit: () -> Unit) {
         if (ScreencastConfig.getReceiverPort() == 0) ScreencastConfig.putReceiverPort(port)
         if (usePassword && password.isEmpty()) password = viewModel.randomPwd()
     }
-    BackHandler(enabled = true) { onExit() }
+    BackHandler(enabled = onExit != null) { onExit?.invoke() }
 
     Column(
-        modifier = Modifier.fillMaxSize().padding(32.dp).verticalScroll(rememberScrollState()),
+        modifier = modifier.fillMaxSize().padding(32.dp).verticalScroll(rememberScrollState()),
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
         Text(text = "投屏接收端")

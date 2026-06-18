@@ -64,6 +64,7 @@ dependencies {
     implementation(Dependencies.Compose.ui)
     implementation(Dependencies.Compose.foundation)
     implementation(Dependencies.Compose.material3)
+    implementation(Dependencies.Compose.material_icons)
     implementation(Dependencies.Compose.tv_material)
     implementation(Dependencies.Compose.tv_foundation)
     implementation(Dependencies.Compose.activity)

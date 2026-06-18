@@ -12,6 +12,7 @@ import android.view.View
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.viewModels
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -28,6 +29,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -42,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -53,15 +56,21 @@ import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.FragmentContainerView
 import androidx.fragment.app.commit
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Cast
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.List
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.tv.material3.Border
 import androidx.tv.material3.Button
+import androidx.tv.material3.ClickableSurfaceDefaults
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
@@ -74,6 +83,7 @@ import com.xyoye.common_component.config.ScreencastConfig
 import com.xyoye.common_component.config.UserConfig
 import com.xyoye.common_component.extension.deletable
 import com.xyoye.common_component.services.ScreencastReceiveService
+import com.xyoye.common_component.utils.SecurityHelper
 import com.xyoye.common_component.utils.scraper.MediaScraper
 import com.xyoye.common_component.utils.scraper.ScrapeProgress
 import com.xyoye.common_component.application.DanDanPlay
@@ -149,20 +159,41 @@ class TvMainActivity : BaseAppCompatActivity<ActivityTvMainBinding>(), LoginObse
     }
 }
 
+/**
+ * 内容区目的地。搜索置顶、设置置底（均通过左侧图标导航栏切换）；
+ * 用户头像不是目的地，而是触发登录弹窗 / 账号信息的独立动作。
+ */
 private enum class TvDestination(val title: String, val icon: ImageVector) {
-    HOME("首页", Icons.Default.Home),
     SEARCH("搜索", Icons.Default.Search),
+    HOME("首页", Icons.Default.Home),
+    WEEKLY("每周番剧", Icons.Default.DateRange),
+    HISTORY("播放历史", Icons.Default.History),
+    SCREENCAST("投屏接收端", Icons.Default.Cast),
     MEDIA("媒体库", Icons.Default.List),
-    PERSONAL("我的", Icons.Default.Person),
 }
 
 @Composable
 private fun TvMainScreen() {
+    val context = LocalContext.current
     var selected by remember { mutableStateOf(TvDestination.HOME) }
+    var showLogin by remember { mutableStateOf(false) }
+
     Row(modifier = Modifier.fillMaxSize()) {
         TvNavRail(
             selected = selected,
             onSelect = { selected = it },
+            onUserClick = {
+                // 已登录 → 账号信息页；未登录 → 专门的登录弹窗
+                if (UserConfig.isUserLoggedIn()) {
+                    TvUserInfoActivity.start(context)
+                } else {
+                    showLogin = true
+                }
+            },
+            onSettingsClick = {
+                // 设置是独立页，启动其专用 Activity（不内嵌进 shell）
+                TvSettingsActivity.start(context)
+            },
             modifier = Modifier.fillMaxHeight()
         )
         Box(modifier = Modifier.weight(1f).fillMaxHeight()) {
@@ -175,63 +206,186 @@ private fun TvMainScreen() {
                     modifier = Modifier.fillMaxSize()
                 )
 
-                TvDestination.MEDIA -> TvMediaScreen(
-                    modifier = Modifier.fillMaxSize().padding(24.dp)
+                TvDestination.WEEKLY -> TvWeeklyAnimeScreen(
+                    modifier = Modifier.fillMaxSize()
                 )
 
-                TvDestination.PERSONAL -> TvPersonalScreen(
+                TvDestination.HISTORY -> TvPlayHistoryScreen(
+                    mediaType = MediaType.OTHER_STORAGE,
+                    title = "播放历史",
                     modifier = Modifier.fillMaxSize()
+                )
+
+                TvDestination.SCREENCAST -> TvScreencastReceiverScreen(
+                    modifier = Modifier.fillMaxSize()
+                )
+
+                TvDestination.MEDIA -> TvMediaScreen(
+                    modifier = Modifier.fillMaxSize().padding(24.dp)
                 )
             }
         }
     }
+
+    if (showLogin) {
+        TvLoginDialog(onDismiss = { showLogin = false })
+    }
 }
 
 /**
- * 图标导航栏：默认窄（仅图标），任一项获得焦点时展开显示文字（聚焦展开）。
+ * 左侧竖排图标导航栏（参考 B 站 TV 番剧页布局）：
+ * - 顶部：搜索 → 切到专门的搜索页
+ * - 中部：首页 / 媒体库
+ * - 底部：用户头像（点按弹出登录弹窗 / 进入账号信息） + 设置（专门的设置页）
  */
 @Composable
 private fun TvNavRail(
     selected: TvDestination,
     onSelect: (TvDestination) -> Unit,
+    onUserClick: () -> Unit,
+    onSettingsClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val selectedFocus = remember { FocusRequester() }
-    var expanded by remember { mutableStateOf(false) }
-    val railWidth by animateDpAsState(
-        targetValue = if (expanded) 240.dp else 104.dp,
-        label = "railWidth"
-    )
+    val homeFocus = remember { FocusRequester() }
     Column(
         modifier = modifier
-            .width(railWidth)
-            .onFocusChanged { expanded = it.hasFocus }
-            .padding(16.dp),
+            .width(72.dp)
+            .padding(vertical = 24.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        TvDestination.values().forEach { dest ->
-            Button(
-                onClick = { onSelect(dest) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .then(
-                        if (dest == selected) Modifier.focusRequester(selectedFocus)
-                        else Modifier
-                    )
+        // 顶部：搜索
+        NavRailIcon(
+            icon = TvDestination.SEARCH.icon,
+            contentDescription = TvDestination.SEARCH.title,
+            selected = selected == TvDestination.SEARCH,
+            onClick = { onSelect(TvDestination.SEARCH) }
+        )
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // 中部：内容导航
+        NavRailIcon(
+            icon = TvDestination.HOME.icon,
+            contentDescription = TvDestination.HOME.title,
+            selected = selected == TvDestination.HOME,
+            focusRequester = homeFocus,
+            onClick = { onSelect(TvDestination.HOME) }
+        )
+        NavRailIcon(
+            icon = TvDestination.WEEKLY.icon,
+            contentDescription = TvDestination.WEEKLY.title,
+            selected = selected == TvDestination.WEEKLY,
+            onClick = { onSelect(TvDestination.WEEKLY) }
+        )
+        NavRailIcon(
+            icon = TvDestination.HISTORY.icon,
+            contentDescription = TvDestination.HISTORY.title,
+            selected = selected == TvDestination.HISTORY,
+            onClick = { onSelect(TvDestination.HISTORY) }
+        )
+        NavRailIcon(
+            icon = TvDestination.MEDIA.icon,
+            contentDescription = TvDestination.MEDIA.title,
+            selected = selected == TvDestination.MEDIA,
+            onClick = { onSelect(TvDestination.MEDIA) }
+        )
+        // 投屏接收端：内嵌内容页（服务启停与本页宿主解耦，离开后服务照常运行）
+        NavRailIcon(
+            icon = TvDestination.SCREENCAST.icon,
+            contentDescription = TvDestination.SCREENCAST.title,
+            selected = selected == TvDestination.SCREENCAST,
+            onClick = { onSelect(TvDestination.SCREENCAST) }
+        )
+
+        Spacer(modifier = Modifier.weight(1f))
+
+        // 底部：用户信息（登录弹窗 / 账号页） + 设置（独立 Activity）
+        NavRailIcon(
+            icon = Icons.Default.Person,
+            contentDescription = "用户信息",
+            selected = false,
+            onClick = onUserClick
+        )
+        NavRailIcon(
+            icon = Icons.Default.Settings,
+            contentDescription = "设置",
+            selected = false,
+            onClick = onSettingsClick
+        )
+    }
+    LaunchedEffect(Unit) { runCatching { homeFocus.requestFocus() } }
+}
+
+/** 导航栏圆形图标按钮：选中态蓝底，聚焦放大 + 白色描边。 */
+@Composable
+private fun NavRailIcon(
+    icon: ImageVector,
+    contentDescription: String,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+    focusRequester: FocusRequester? = null,
+    onClick: () -> Unit
+) {
+    Surface(
+        onClick = onClick,
+        shape = ClickableSurfaceDefaults.shape(CircleShape),
+        scale = ClickableSurfaceDefaults.scale(focusedScale = 1.12f),
+        colors = ClickableSurfaceDefaults.colors(
+            containerColor = if (selected) Color(0xFF3F8CFF) else Color(0x1FFFFFFF),
+            contentColor = if (selected) Color.White else Color(0xFFBFBFBF),
+            focusedContainerColor = Color(0xFF3F8CFF),
+            focusedContentColor = Color.White
+        ),
+        border = ClickableSurfaceDefaults.border(
+            focusedBorder = Border(BorderStroke(2.dp, Color.White), shape = CircleShape)
+        ),
+        modifier = modifier
+            .size(40.dp)
+            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+    ) {
+        Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxSize()) {
+            Icon(
+                imageVector = icon,
+                contentDescription = contentDescription,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+    }
+}
+
+/**
+ * 专门的登录弹窗（账号 / 密码）。由左侧导航栏底部用户头像在未登录时触发，
+ * 复用 [TvLoginViewModel] 的登录逻辑与 [TvFormField] 的遥控器输入。
+ */
+@Composable
+private fun TvLoginDialog(onDismiss: () -> Unit) {
+    val viewModel: TvLoginViewModel = viewModel()
+    val official = remember {
+        runCatching { SecurityHelper.getInstance().isOfficialApplication() }.getOrDefault(false)
+    }
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(modifier = Modifier.width(560.dp)) {
+            Column(
+                modifier = Modifier.padding(28.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Icon(imageVector = dest.icon, contentDescription = dest.title)
-                    if (expanded) {
-                        Text(text = dest.title)
-                    }
+                Text(text = "登录 DanDanPlay")
+                if (official != true) {
+                    Text(
+                        text = "提示：自编译版本账号功能受限，需官方包或在「设置 - 应用设置」配置开发者凭据，否则登录会返回 403。",
+                        color = Color(0xFFE5A23B)
+                    )
                 }
+                TvFormField(label = "帐号", value = viewModel.account, placeholder = "未填写") { viewModel.account = it }
+                TvFormField(label = "密码", value = viewModel.password, isPassword = true, placeholder = "未填写") { viewModel.password = it }
+                Button(
+                    onClick = { viewModel.login(onSuccess = onDismiss) },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text(text = if (viewModel.loading) "登录中…" else "登录") }
             }
         }
     }
-    LaunchedEffect(Unit) { runCatching { selectedFocus.requestFocus() } }
 }
 
 /**

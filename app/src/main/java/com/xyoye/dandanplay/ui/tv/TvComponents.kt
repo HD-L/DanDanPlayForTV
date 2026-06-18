@@ -54,10 +54,12 @@ fun TvPosterCard(
     badge: String? = null,
     progress: Float? = null,
     width: Dp = 150.dp,
-    posterHeight: Dp = 210.dp
+    posterHeight: Dp = 210.dp,
+    onLongClick: (() -> Unit)? = null
 ) {
     Surface(
         onClick = onClick,
+        onLongClick = onLongClick,
         modifier = modifier.width(width),
         shape = ClickableSurfaceDefaults.shape(CardShape),
         scale = ClickableSurfaceDefaults.scale(focusedScale = 1.08f),

@@ -36,15 +36,6 @@ class AppSettingFragment : PreferenceFragmentCompat() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val backupDomainAddress = findPreference<EditTextPreference>("backup_domain_address")
 
-        findPreference<Preference>("dark_mode")?.apply {
-            setOnPreferenceClickListener {
-                ARouter.getInstance()
-                    .build(RouteTable.User.SwitchTheme)
-                    .navigation()
-                return@setOnPreferenceClickListener true
-            }
-        }
-
         findPreference<Preference>("app_version")?.apply {
             summary = AppUtils.getVersionName()
             setOnPreferenceClickListener {

@@ -155,6 +155,14 @@ private fun HubHero(
                     )
                 )
         )
+        // 右上角实时时钟（参考 B 站 TV 首页布局）
+        Text(
+            text = rememberClockText(),
+            color = Color(0xFFE8E8E8),
+            modifier = Modifier
+                .align(Alignment.TopEnd)
+                .padding(top = 20.dp, end = 32.dp)
+        )
         Column(
             modifier = Modifier
                 .align(Alignment.BottomStart)
@@ -286,4 +294,22 @@ private fun progressFraction(history: PlayHistoryEntity): Float? {
     val duration = history.videoDuration
     if (duration <= 0) return null
     return (history.videoPosition.toFloat() / duration).coerceIn(0f, 1f)
+}
+
+/** 每分钟刷新一次的 HH:mm 时钟文本。 */
+@Composable
+private fun rememberClockText(): String {
+    var text by remember { mutableStateOf(currentClockText()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            text = currentClockText()
+            kotlinx.coroutines.delay(10_000)
+        }
+    }
+    return text
+}
+
+private fun currentClockText(): String {
+    return java.text.SimpleDateFormat("HH:mm", java.util.Locale.getDefault())
+        .format(java.util.Date())
 }

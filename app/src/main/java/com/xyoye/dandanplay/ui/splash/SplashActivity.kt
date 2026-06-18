@@ -43,8 +43,8 @@ class SplashActivity : BaseAppCompatActivity<ActivitySplashBinding>() {
             addFlags(WindowManager.LayoutParams.FLAG_SHOW_WALLPAPER)
         }
 
-        val mode = AppConfig.getDarkMode()
-        AppCompatDelegate.setDefaultNightMode(mode)
+        // 全局固定深色主题（已移除浅色模式与切换入口）
+        AppCompatDelegate.setDefaultNightMode(AppCompatDelegate.MODE_NIGHT_YES)
 
         if (!AppConfig.isShowSplashAnimation()) {
             launchActivity()

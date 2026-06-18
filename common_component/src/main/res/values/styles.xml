@@ -21,7 +21,7 @@
         <item name="android:activityCloseExitAnimation">@anim/anim_activity_exit</item>
     </style>
 
-    <style name="DialogActivityTheme" parent="Theme.AppCompat.Light.Dialog">
+    <style name="DialogActivityTheme" parent="Theme.AppCompat.Dialog">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="colorPrimary">@color/theme</item>

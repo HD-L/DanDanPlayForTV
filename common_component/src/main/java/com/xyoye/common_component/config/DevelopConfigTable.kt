@@ -12,13 +12,13 @@ import com.xyoye.mmkv_annotation.MMKVKotlinClass
 @MMKVKotlinClass(className = "DevelopConfig")
 object DevelopConfigTable {
 
-    // AppId
+    // AppId（自编译包内置开发者凭据，开箱即用）
     @MMKVFiled
-    const val appId = ""
+    const val appId = "b5mf89nmb2"
 
     // App Secret
     @MMKVFiled
-    const val appSecret = ""
+    const val appSecret = "9gaqDwn68mRywViZb5sQjhxEIbWk4yaY"
 
     // 是否已自动显示认证弹窗
     @MMKVFiled

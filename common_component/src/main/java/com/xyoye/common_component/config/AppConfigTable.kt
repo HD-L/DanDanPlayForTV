@@ -1,6 +1,5 @@
 package com.xyoye.common_component.config
 
-import androidx.appcompat.app.AppCompatDelegate
 import com.xyoye.common_component.network.config.Api
 import com.xyoye.common_component.utils.meida.VideoExtension
 import com.xyoye.data_component.enums.HistorySort
@@ -33,10 +32,6 @@ object AppConfigTable {
     @MMKVFiled
     //最后一次更新云屏蔽信息的时间
     var cloudBlockUpdateTime: Long = 0
-
-    @MMKVFiled
-    //深色模式状态
-    var darkMode: Int = AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
 
     @MMKVFiled
     //常用目录1
