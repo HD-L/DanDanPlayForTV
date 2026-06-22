@@ -6,7 +6,6 @@ import androidx.lifecycle.viewModelScope
 import com.xyoye.common_component.base.BaseViewModel
 import com.xyoye.common_component.extension.toastError
 import com.xyoye.common_component.network.repository.UserRepository
-import com.xyoye.common_component.utils.SecurityHelper
 import com.xyoye.common_component.utils.UserInfoHelper
 import com.xyoye.common_component.weight.ToastCenter
 import com.xyoye.data_component.data.LoginData
@@ -30,20 +29,9 @@ class LoginViewModel : BaseViewModel() {
         if (!allowLogin)
             return
 
-        val appId = SecurityHelper.getInstance().appId
-        val unixTimestamp = System.currentTimeMillis() / 1000
-        val hashInfo = appId + password + unixTimestamp + account
-        val hash = SecurityHelper.getInstance().buildHash(hashInfo)
-
         viewModelScope.launch {
             showLoading()
-            val result = UserRepository.login(
-                account!!,
-                password!!,
-                appId,
-                unixTimestamp.toString(),
-                hash
-            )
+            val result = UserRepository.login(account!!, password!!)
             hideLoading()
 
             if (result.isFailure) {

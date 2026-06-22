@@ -67,13 +67,9 @@ class TvLoginViewModel : ViewModel() {
         if (account.isEmpty()) { ToastCenter.showWarning("请输入帐号"); return }
         if (password.isEmpty()) { ToastCenter.showWarning("请输入密码"); return }
 
-        val appId = SecurityHelper.getInstance().appId
-        val timestamp = System.currentTimeMillis() / 1000
-        val hash = SecurityHelper.getInstance().buildHash(appId + password + timestamp + account)
-
         viewModelScope.launch {
             loading = true
-            val result = UserRepository.login(account, password, appId, timestamp.toString(), hash)
+            val result = UserRepository.login(account, password)
             loading = false
             if (result.isFailure) {
                 ToastCenter.showError(result.exceptionOrNull()?.message ?: "登录失败")

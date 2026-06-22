@@ -6,6 +6,7 @@ import com.alibaba.android.arouter.facade.annotation.Autowired
 import com.alibaba.android.arouter.facade.annotation.Route
 import com.alibaba.android.arouter.launcher.ARouter
 import com.xyoye.common_component.base.BaseActivity
+import com.xyoye.common_component.config.DevelopConfig
 import com.xyoye.common_component.config.RouteTable
 import com.xyoye.common_component.utils.SecurityHelper
 import com.xyoye.common_component.utils.showKeyboard
@@ -36,8 +37,11 @@ class LoginActivity : BaseActivity<LoginViewModel, ActivityLoginBinding>() {
 
         title = ""
 
+        // 官方包或已配置开发者凭据(DevelopConfig)均可登录；否则才拦截。
         val isOfficialApplication = SecurityHelper.getInstance().isOfficialApplication!!
-        if (!isOfficialApplication) {
+        val hasDeveloperCert = !DevelopConfig.getAppId().isNullOrEmpty() &&
+            !DevelopConfig.getAppSecret().isNullOrEmpty()
+        if (!isOfficialApplication && !hasDeveloperCert) {
             showLimitDialog()
             return
         }
