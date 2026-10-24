@@ -2,7 +2,7 @@
 
 面向 Android TV 的弹幕视频播放器，是 [DanDanPlayForAndroid](https://github.com/xyoye/DanDanPlayForAndroid)（弹弹play 概念版）的 TV 版。设计从遥控器的观看流程出发，用 Compose for TV 独立重写。它能播放本地和局域网视频，自动匹配弹弹play 弹幕，浏览每周番剧；需要打字的地方都改用手机扫码填写。
 
-> 这是非官方项目，与弹弹play 官方无关。应用只是播放器，不提供、不托管任何视频资源。当前版本 0.5.4 Beta，还在测试阶段。
+> 这是非官方项目，与弹弹play 官方无关。应用只是播放器，不提供、不托管任何视频资源。当前版本 0.5.5 Beta，还在测试阶段。
 
 <p>
 <img src="docs/screenshots/0.3.0-%E9%A6%96%E9%A1%B5%E6%B5%B7%E6%8A%A5%E5%A2%99.png" width="49%" alt="首页海报墙">

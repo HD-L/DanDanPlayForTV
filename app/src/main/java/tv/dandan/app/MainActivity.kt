@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -27,6 +28,7 @@ import tv.dandan.app.ui.TvApp
 import tv.dandan.app.ui.TvHost
 import tv.dandan.app.ui.components.PhoneFormUiState
 import tv.dandan.app.ui.components.Toaster
+import tv.dandan.core.ExitRules
 import tv.dandan.core.MediaEntry
 import tv.dandan.core.MediaSource
 import tv.dandan.core.QueueWindow
@@ -55,6 +57,8 @@ class MainActivity : ComponentActivity(), TvHost {
     private data class DocumentRequest(val callback: (Uri) -> Unit, val cancelled: () -> Unit, val persistent: Boolean)
     private var documentRequest: DocumentRequest? = null
     private var returningFromPlayer = false
+    /** 上一次在首页按返回的时刻，用于“再按一次返回键退出”。 */
+    private var exitArmedAt = 0L
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -72,14 +76,18 @@ class MainActivity : ComponentActivity(), TvHost {
     }
 
     /**
-     * 返回键：先退子页面；栏目根页上，内容区有焦点时把焦点交给左侧导航，
-     * 导航上再按返回回到首页，首页再按返回退出应用。
+     * 返回键：先退子页面；其他栏目根页上，内容区有焦点时把焦点交给左侧导航，导航上再按返回回到首页。
+     * 首页上按返回只提示“再按一次返回键退出”（焦点同时回到导航），提示期间再按一次才退出应用。
      */
     private fun back() {
         when {
             navigator.pop() -> Unit
-            !railHasFocus -> if (!runCatching { railFocus.requestFocus() }.getOrDefault(false)) { if (navigator.tab == 0) finish() else navigator.switchTab(0) }
-            navigator.tab == 0 -> finish()
+            navigator.tab == 0 -> {
+                if (!railHasFocus) runCatching { railFocus.requestFocus() }
+                val now = SystemClock.elapsedRealtime()
+                if (ExitRules.shouldExit(exitArmedAt, now)) finish() else { exitArmedAt = now; toaster.show("再按一次返回键退出") }
+            }
+            !railHasFocus -> if (!runCatching { railFocus.requestFocus() }.getOrDefault(false)) navigator.switchTab(0)
             else -> navigator.switchTab(0, fromRail = true)
         }
     }

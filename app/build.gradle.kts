@@ -15,7 +15,7 @@ android {
         applicationId = "tv.dandan.clean"
         minSdk = 26
         targetSdk = 36
-        versionCode = 10
+        versionCode = 11
         versionName = "0.5.5"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // 调试时可用 -Pabi=arm64-v8a 只打单一架构，减小包体；不传则包含全部架构。
