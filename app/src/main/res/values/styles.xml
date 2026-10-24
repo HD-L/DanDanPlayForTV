@@ -1,9 +1,1 @@
-<resources>
-
-    <style name="SplashTheme" parent="@style/Theme.AppCompat.NoActionBar">
-        <item name="android:windowBackground">@android:color/transparent</item>
-        <item name="android:windowContentOverlay">@null</item>
-        <item name="android:windowShowWallpaper">true</item>
-        <item name="android:windowAnimationStyle">@style/ActivityAnimStyle</item>
-    </style>
-</resources>
+<resources><style name="TvTheme" parent="android:style/Theme.Material.NoActionBar"><item name="android:fontFamily">sans</item><item name="android:windowActionModeOverlay">true</item><item name="android:windowFullscreen">true</item><item name="android:windowLightStatusBar">false</item><item name="android:colorAccent">#72E0BC</item><item name="android:windowBackground">#101923</item><item name="android:windowNoTitle">true</item></style></resources>
