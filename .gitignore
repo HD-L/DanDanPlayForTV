@@ -3,6 +3,9 @@
 **/build/
 local.properties
 *.keystore
+*.jks
+keystore.properties
+signing/
 tools/bridge/queue/
 tools/bridge/apk/
 tools/bridge/media/

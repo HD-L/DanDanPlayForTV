@@ -2,7 +2,7 @@
 
 面向 Android TV 的弹幕视频播放器，是 [DanDanPlayForAndroid](https://github.com/xyoye/DanDanPlayForAndroid)（弹弹play 概念版）的 TV 版。设计从遥控器的观看流程出发，用 Compose for TV 独立重写。它能播放本地和局域网视频，自动匹配弹弹play 弹幕，浏览每周番剧；需要打字的地方都改用手机扫码填写。
 
-> 这是非官方项目，与弹弹play 官方无关。应用只是播放器，不提供、不托管任何视频资源。当前版本 0.5.4，只有调试签名包，还没有正式发布版。
+> 这是非官方项目，与弹弹play 官方无关。应用只是播放器，不提供、不托管任何视频资源。当前版本 0.5.4 Beta，还在测试阶段。
 
 <p>
 <img src="docs/screenshots/0.3.0-%E9%A6%96%E9%A1%B5%E6%B5%B7%E6%8A%A5%E5%A2%99.png" width="49%" alt="首页海报墙">
@@ -27,16 +27,27 @@
 
 ## 安装
 
-仓库里没有现成的 APK，需要自己构建。要求 Android 8.0（API 26）或以上，界面按横屏电视设计，不需要触摸屏。包名是 `tv.dandan.clean`，可以和原版应用同时安装。
+要求 Android 8.0（API 26）或以上，界面按横屏电视设计，不需要触摸屏。包名是 `tv.dandan.clean`，可以和原版应用同时安装。
+
+在 [Releases](https://github.com/HD-L/DanDanPlayForTV/releases) 页面下载安装包，按电视的处理器选一个：
+
+| 安装包 | 适合的设备 |
+| --- | --- |
+| `…-arm64-v8a.apk` | 大多数近几年的电视和盒子（64 位） |
+| `…-armeabi-v7a.apk` | 较老的 32 位电视和盒子；装不上 v8 包时用这个 |
+
+把 APK 复制到电视上，用系统文件管理器安装；也可以在电脑上用 `adb install -r 文件名.apk` 安装。Release 里的安装包用本项目的发布密钥签名。如果电视上装过自己用源码构建的调试版，签名不同，需要先卸载调试版才能安装（卸载会清空数据，可以先在“设置 → 数据管理与备份”导出备份）。
+
+也可以自己构建调试版：
 
 ```bash
-# 只打 arm64 包（约 81 MiB），适合大多数电视
+# 只打 arm64 包（约 81 MiB）
 ./gradlew :app:assembleDebug -Pabi=arm64-v8a
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb shell am start -n tv.dandan.clean/tv.dandan.app.MainActivity
 ```
 
-去掉 `-Pabi` 参数会同时打包 arm64、armv7、x86 和 x86-64 四种架构，体积约 220 MiB。也可以把 APK 复制到电视上，用系统文件管理器安装。
+去掉 `-Pabi` 参数会同时打包 arm64、armv7、x86 和 x86-64 四种架构，体积约 220 MiB。
 
 ## 首次使用
 
@@ -67,6 +78,8 @@ adb shell am start -n tv.dandan.clean/tv.dandan.app.MainActivity
 node --test tools/tests/remote-page.test.mjs   # 可选：测试手机网页的脚本，需要 Node.js
 ```
 
+构建发布版：`./gradlew :app:assembleRelease -Pabi=arm64-v8a`（32 位换成 `armeabi-v7a`）。要签名的话，在仓库根目录放一个 `keystore.properties`，写明 `storeFile`、`storePassword`、`keyAlias`、`keyPassword` 四项，构建时会自动签名。这个文件和密钥文件（`*.jks`、`signing/`）都已加入 `.gitignore`，不会提交。没有这个文件时，生成的是未签名的发布包，可以之后用 `apksigner` 签名。
+
 主要依赖的版本：Gradle 8.13、AGP 8.13.2、Kotlin 2.3.10、Compose BOM 2026.06.01、tv-material 1.1.0、Media3 1.11.1、LibVLC 3.7.7、Coil 3.5.0、Opencc4j 1.14.0。
 
 代码结构：
@@ -91,7 +104,7 @@ tools/             手机网页的脚本测试；bridge/ 下是在电脑上通�
 
 ## 已知限制
 
-- 目前只有调试签名包。实机只在华为 KANT-370（Android 10）上验收过，其余结果来自 Android TV 模拟器。
+- 目前是 Beta 版。实机只在华为 KANT-370（Android 10）上验收过，其余结果来自 Android TV 模拟器；armeabi-v7a 安装包只校验了签名和架构，还没在 32 位设备上实测。
 - 网络来源的实际网速低于视频码率时，播放仍会周期性缓冲。应用只能把停顿合并成次数少、时间长的几次。
 - 磁链下载用的是迅雷的闭源库，只支持 arm64-v8a 和 armeabi-v7a，x86 设备上会自动隐藏入口。
 - 弹弹play 接口按应用分配调用额度，额度用完后片库识别会暂停，等额度恢复后继续。

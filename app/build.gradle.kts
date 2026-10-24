@@ -1,4 +1,13 @@
+import java.util.Properties
+
 plugins { id("com.android.application"); kotlin("android"); id("org.jetbrains.kotlin.plugin.compose") }
+
+// 发布版签名：仓库根目录的 keystore.properties（不入库）写明 storeFile、storePassword、keyAlias、keyPassword。
+// 没有这个文件时发布版不签名，可以之后用 apksigner 单独签名。
+val releaseSigning = rootProject.file("keystore.properties").takeIf { it.isFile }?.let { file ->
+    Properties().apply { file.inputStream().use(::load) }
+}
+
 android {
     namespace = "tv.dandan.app"
     compileSdk = 36
@@ -11,6 +20,21 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         // 调试时可用 -Pabi=arm64-v8a 只打单一架构，减小包体；不传则包含全部架构。
         (project.findProperty("abi") as String?)?.takeIf { it.isNotBlank() }?.let { ndk { abiFilters += it.split(",") } }
+    }
+    signingConfigs {
+        if (releaseSigning != null) create("release") {
+            storeFile = rootProject.file(releaseSigning.getProperty("storeFile"))
+            storePassword = releaseSigning.getProperty("storePassword")
+            keyAlias = releaseSigning.getProperty("keyAlias")
+            keyPassword = releaseSigning.getProperty("keyPassword")
+        }
+    }
+    buildTypes {
+        release {
+            // 暂不开启代码压缩：LibVLC、迅雷库等依赖反射和 JNI，开启前需要逐项补混淆规则并实机验证
+            isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("release")
+        }
     }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
     buildFeatures { compose = true }
